@@ -38,6 +38,10 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
   bool _isFlashlightOn = false;
   bool _showResults = false;
   int _estimatedBPM = 0; // To store the calculated heart rate
+  bool _isFingerDetected = false;
+  Timer? _fingerDetectionTimer;
+  static const int _fingerDetectionThreshold = 5; // Number of consecutive detections needed
+  int _consecutiveDetections = 0;
 
   // Isolate related variables
   Isolate? _processingIsolate;
@@ -107,6 +111,8 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
         setState(() {
           _isCameraInitialized = true;
         });
+        // Start finger detection stream
+        _startFingerDetection();
       }
     } catch (e) {
       if (mounted) {
@@ -137,38 +143,73 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
     }
   }
 
+  void _startFingerDetection() {
+    if (_cameraController == null || !_isCameraInitialized) return;
+
+    _cameraController!.startImageStream((CameraImage image) {
+      if (isMeasuring) {
+        // If we're measuring, stop the finger detection stream
+        _cameraController?.stopImageStream();
+        return;
+      }
+
+      // Calculate average brightness from Y plane
+      double avgBrightness = 0;
+      if (image.planes.isNotEmpty) {
+        avgBrightness = image.planes[0].bytes.reduce((value, element) => value + element) / image.planes[0].bytes.length;
+      }
+
+      // Finger detection logic
+      // When finger covers camera, brightness drops significantly
+      bool isFingerPresent = avgBrightness < 50; // Adjust threshold as needed
+
+      if (isFingerPresent) {
+        _consecutiveDetections++;
+        if (_consecutiveDetections >= _fingerDetectionThreshold && !isMeasuring) {
+          _consecutiveDetections = 0;
+          // Stop the finger detection stream before starting measurement
+          _cameraController?.stopImageStream();
+          _startMeasurement();
+        }
+      } else {
+        _consecutiveDetections = 0;
+      }
+    });
+  }
 
   void _startMeasurement() async {
-    if (!_isCameraInitialized || !_isFlashlightOn) {
+    if (!_isCameraInitialized) {
       if (mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
-           const SnackBar(content: Text('Please ensure camera is ready and flashlight is on')),
-         );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please ensure camera is ready')),
+        );
       }
       return;
     }
 
+    // Turn on flashlight automatically
+    await _toggleFlashlight(true);
+
     if (mounted) {
-       setState(() {
-         isMeasuring = true;
-         _showResults = false;
-         measurementProgress = 0.0;
-         _estimatedBPM = 0;
-         _elapsedSeconds = 0;
-       });
+      setState(() {
+        isMeasuring = true;
+        _showResults = false;
+        measurementProgress = 0.0;
+        _estimatedBPM = 0;
+        _elapsedSeconds = 0;
+      });
     }
 
-
-    WakelockPlus.enable(); // Keep screen on during measurement
+    WakelockPlus.enable();
 
     // Start the isolate first to get the sendPort
     await _startProcessingIsolate();
 
     // Start the image stream and send images to the isolate
-     _startImageStream();
+    _startImageStream();
 
     // Start the measurement timer for progress and completion
-     _startMeasurementTimer();
+    _startMeasurementTimer();
   }
 
   void _startImageStream() {
@@ -394,11 +435,19 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
     }
 
      _toggleFlashlight(false); // Turn off flashlight
+     
+     // Restart finger detection after a short delay
+     Future.delayed(const Duration(milliseconds: 500), () {
+       if (mounted && !isMeasuring && !_showResults) {
+         _startFingerDetection();
+       }
+     });
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
+    _cameraController?.stopImageStream();
     _cameraController?.dispose();
     _processingIsolate?.kill(); // Ensure isolate is killed on dispose
     _receivePort?.close();
@@ -426,63 +475,32 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
   }
 
   Widget _buildSetupView() {
-    // This view remains largely the same, just ensuring flashlight toggle works
     return Stack(
       children: [
         // Camera preview
         if (_cameraController != null && _cameraController!.value.isInitialized)
-           Positioned.fill( // Use Positioned.fill to cover the whole area
+          Positioned.fill(
             child: AspectRatio(
-               aspectRatio: _cameraController!.value.aspectRatio,
-               child: CameraPreview(_cameraController!),
+              aspectRatio: _cameraController!.value.aspectRatio,
+              child: CameraPreview(_cameraController!),
             ),
           ),
         // Overlay
         Container(
           width: double.infinity,
           height: double.infinity,
-          color: Colors.black.withOpacity(0.5), // Darken overlay for better contrast
+          color: Colors.black.withOpacity(0.5),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // Instruction text
               Text(
-                _isFlashlightOn ? 'Cover the camera and flash with your finger' : 'Turn on the flashlight to start measurement',
+                'Place your finger on the camera to start measurement',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: TColor.white,
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 40),
-               // Flashlight toggle button
-              FloatingActionButton(
-                 onPressed: () => _toggleFlashlight(!_isFlashlightOn),
-                 backgroundColor: _isFlashlightOn ? TColor.primaryColor1 : TColor.subTextColor,
-                 child: Icon(
-                   _isFlashlightOn ? Icons.flash_on : Icons.flash_off,
-                   color: TColor.white,
-                 ),
-               ),
-              const SizedBox(height: 40),
-              // Start measurement button
-              ElevatedButton(
-                onPressed: _isFlashlightOn ? _startMeasurement : null, // Enable only when flashlight is on
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: TColor.primaryColor1,
-                  foregroundColor: TColor.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
-                child: const Text(
-                  'Start Measurement',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
                 ),
               ),
             ],
