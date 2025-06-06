@@ -122,20 +122,26 @@ class _LoginViewState extends State<LoginView> {
           message = 'No user found with this email.';
           break;
         case 'wrong-password':
-          message = 'Wrong password provided.';
+          message = 'Wrong password provided for that user.';
           break;
         case 'invalid-email':
           message = 'The email address is not valid.';
           break;
+        case 'network-request-failed':
+          message = 'Network error. Please check your internet connection.';
+          break;
+        case 'too-many-requests':
+          message = 'Too many sign-in attempts. Try again later.';
+          break;
         default:
-          message = 'An error occurred. Please try again.';
+          message = 'Login failed: ${e.message ?? e.code}. Please try again.';
       }
       setState(() {
         _errorMessage = message;
       });
     } catch (e) {
       setState(() {
-        _errorMessage = 'An error occurred. Please try again.';
+        _errorMessage = 'An unexpected error occurred: ${e.toString()}. Please try again.';
       });
     } finally {
       if (mounted) {
@@ -228,7 +234,7 @@ class _LoginViewState extends State<LoginView> {
                               child: Text(
                                 _errorMessage!,
                                 style: TextStyle(
-                                  color: TColor.primaryColor2,
+                                  color: Colors.red.shade700,
                                   fontSize: 14,
                                 ),
                               ),

@@ -5,6 +5,9 @@ import 'package:provider/provider.dart';
 import '../profile/profile_view.dart';
 import '../../common/colo_extension.dart';
 import '../../providers/user_provider.dart';
+import '../../services/measurement_service.dart';
+import '../../model/measurement.dart';
+import 'dart:async';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -18,6 +21,11 @@ class _HomeViewState extends State<HomeView>
   late AnimationController _heartController;
   late Animation<double> _heartAnimation;
 
+  final MeasurementService _measurementService = MeasurementService();
+  Measurement? _latestMeasurement;
+  bool _isLoadingMeasurement = true;
+  StreamSubscription? _measurementSubscription;
+
   @override
   void initState() {
     super.initState();
@@ -29,11 +37,13 @@ class _HomeViewState extends State<HomeView>
       CurvedAnimation(parent: _heartController, curve: Curves.easeInOut),
     );
     _loadUserData();
+    _fetchLatestMeasurement();
   }
 
   @override
   void dispose() {
     _heartController.dispose();
+    _measurementSubscription?.cancel();
     super.dispose();
   }
 
@@ -45,6 +55,40 @@ class _HomeViewState extends State<HomeView>
         listen: false,
       ).loadUser(user.uid);
     }
+  }
+
+  void _fetchLatestMeasurement() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      setState(() {
+        _isLoadingMeasurement = false;
+      });
+      return;
+    }
+
+    _measurementSubscription = _measurementService
+        .getUserMeasurements(user.uid)
+        .listen((measurements) {
+      if (mounted) {
+        setState(() {
+          // Assuming the stream provides measurements ordered by timestamp descending
+          _latestMeasurement = measurements.isNotEmpty ? measurements.first : null;
+          _isLoadingMeasurement = false;
+        });
+      }
+    }, onError: (error) {
+      if (mounted) {
+        setState(() {
+          _isLoadingMeasurement = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to fetch latest measurement: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    });
   }
 
   List<Map<String, dynamic>> _getLearningModules(BuildContext context) {
@@ -241,6 +285,123 @@ class _HomeViewState extends State<HomeView>
               style: TextStyle(color: TColor.subTextColor, fontSize: 12),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildYourReadingSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            'Your Last Reading',
+            style: TextStyle(
+              color: TColor.textColor,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        _isLoadingMeasurement
+            ? Center(child: CircularProgressIndicator(color: TColor.primaryColor1,))
+            : _latestMeasurement == null
+                ? Center(
+                    child: Text(
+                      'No measurements recorded yet.',
+                      style: TextStyle(
+                        color: TColor.subTextColor,
+                        fontSize: 16,
+                      ),
+                    ),
+                  )
+                : SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: [
+                        _buildReadingCard(
+                          title: 'Blood Pressure',
+                          value: '${_latestMeasurement!.systolicBP}/${_latestMeasurement!.diastolicBP}',
+                          unit: 'mmHg',
+                          icon: Icons.favorite,
+                          color: TColor.primaryColor1,
+                        ),
+                        _buildReadingCard(
+                          title: 'Heart Rate',
+                          value: _latestMeasurement!.heartRate.toString(),
+                          unit: 'bpm',
+                          icon: Icons.favorite_border,
+                          color: TColor.secondaryColor1,
+                          isPulsating: true,
+                        ),
+                      ],
+                    ),
+                  ),
+      ],
+    );
+  }
+
+  Widget _buildReadingCard({
+    required String title,
+    required String value,
+    required String unit,
+    required IconData icon,
+    required Color color,
+    bool isPulsating = false,
+  }) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    return _buildCard(
+      backgroundColor: color.withOpacity(0.1),
+      child: SizedBox(
+        width: 140,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: color, size: 20),
+                const SizedBox(width: 4),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: TColor.textColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            isPulsating
+                ? ScaleTransition(
+                    scale: _heartAnimation,
+                    child: Text(
+                      value,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  )
+                : Text(
+                    value,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+            Text(
+              unit,
+              style: TextStyle(color: TColor.subTextColor, fontSize: 12),
             ),
           ],
         ),
