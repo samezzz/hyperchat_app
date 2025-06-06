@@ -7,6 +7,7 @@ import '../../common/colo_extension.dart';
 import '../../providers/user_provider.dart';
 import '../../services/measurement_service.dart';
 import '../../model/measurement.dart';
+import '../../services/tip_service.dart';
 import 'dart:async';
 
 class HomeView extends StatefulWidget {
@@ -25,6 +26,8 @@ class _HomeViewState extends State<HomeView>
   Measurement? _latestMeasurement;
   bool _isLoadingMeasurement = true;
   StreamSubscription? _measurementSubscription;
+  final TipService _tipService = TipService();
+  bool _isLoadingTip = false;
 
   @override
   void initState() {
@@ -96,6 +99,88 @@ class _HomeViewState extends State<HomeView>
             }
           },
         );
+  }
+
+  void _showDailyTip() async {
+    setState(() {
+      _isLoadingTip = true;
+    });
+
+    final tip = await _tipService.getDailyTip();
+
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingTip = false;
+    });
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: TColor.primaryColor1.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.lightbulb,
+                  color: TColor.primaryColor1,
+                  size: 30,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                "Today's Tip",
+                style: TextStyle(
+                  color: TColor.textColor,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                tip,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: TColor.textColor,
+                  fontSize: 16,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 30),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: TColor.primaryColor1,
+                  foregroundColor: TColor.white,
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  "Got it!",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   List<Map<String, dynamic>> _getLearningModules(BuildContext context) {
@@ -213,9 +298,7 @@ class _HomeViewState extends State<HomeView>
                 icon: Icons.lightbulb,
                 title: "Today's Tip",
                 subtitle: 'Daily hypertension tips and facts',
-                onTap: () {
-                  // TODO: Implement daily tips
-                },
+                onTap: _showDailyTip,
               ),
               _buildQuickActionCard(
                 icon: Icons.assignment,
@@ -255,53 +338,51 @@ class _HomeViewState extends State<HomeView>
     required VoidCallback onTap,
   }) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 160,
-        margin: const EdgeInsets.only(right: 16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDarkMode
-              ? TColor.darkSurface
-              : TColor.secondaryColor2.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: TColor.subTextColor.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: TColor.primaryColor1.withAlpha(20),
-                borderRadius: BorderRadius.circular(12),
+    return Container(
+      margin: const EdgeInsets.only(right: 16),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 160,
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: isDarkMode ? TColor.darkSurface : TColor.white,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: TColor.black.withAlpha(13),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
               ),
-              child: Icon(icon, color: TColor.primaryColor1, size: 24),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: TextStyle(
-                color: TColor.textColor,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                icon,
+                color: TColor.primaryColor1,
+                size: 24,
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: TextStyle(color: TColor.subTextColor, fontSize: 12),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+              const SizedBox(height: 10),
+              Text(
+                title,
+                style: TextStyle(
+                  color: TColor.textColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: TColor.subTextColor,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
