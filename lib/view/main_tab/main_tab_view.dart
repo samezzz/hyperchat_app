@@ -16,14 +16,14 @@ class MainTabView extends StatefulWidget {
 
 class _MainTabViewState extends State<MainTabView> {
   int selectTab = 0;
-  final PageStorageBucket pageBucket = PageStorageBucket(); 
+  final PageStorageBucket pageBucket = PageStorageBucket();
   Widget currentTab = const HomeView();
 
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     TColor.toggleDarkMode(isDarkMode);
-    
+
     return Scaffold(
       backgroundColor: TColor.bgColor,
       body: PageStorage(bucket: pageBucket, child: currentTab),
@@ -37,10 +37,12 @@ class _MainTabViewState extends State<MainTabView> {
               currentTab = const MeasureView();
             });
           },
-          backgroundColor: TColor.primaryColor1,
+          backgroundColor: isDarkMode
+              ? TColor.primaryColor1
+              : TColor.primaryColor1,
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(35),
           ),
           child: Icon(
             selectTab == 1 ? Icons.favorite : Icons.favorite_outline,
@@ -50,7 +52,9 @@ class _MainTabViewState extends State<MainTabView> {
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: isDarkMode ? Color.fromARGB(255, 111, 78, 44) : Color.fromARGB(255, 255, 238, 220),
+          color: isDarkMode
+              ? Color.fromARGB(255, 80, 80, 80)
+              : Color.fromARGB(255, 255, 232, 206),
           boxShadow: [
             BoxShadow(
               color: TColor.black.withAlpha(13),
@@ -100,7 +104,9 @@ class _MainTabViewState extends State<MainTabView> {
                 Row(
                   children: [
                     _buildNavItem(
-                      icon: selectTab == 3 ? Icons.bar_chart : Icons.bar_chart_outlined,
+                      icon: selectTab == 3
+                          ? Icons.bar_chart
+                          : Icons.bar_chart_outlined,
                       isSelected: selectTab == 3,
                       onTap: () {
                         setState(() {
