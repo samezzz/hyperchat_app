@@ -101,11 +101,11 @@ class _HomeViewState extends State<HomeView>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: backgroundColor ?? TColor.cardColor,
+        color: backgroundColor ?? (isDarkMode ? TColor.darkSurface : TColor.secondaryColor2.withOpacity(0.1)),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: TColor.subTextColor.withAlpha(0),
+            color: TColor.subTextColor.withOpacity(0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -197,6 +197,7 @@ class _HomeViewState extends State<HomeView>
     required String subtitle,
     required VoidCallback onTap,
   }) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -204,11 +205,11 @@ class _HomeViewState extends State<HomeView>
         margin: const EdgeInsets.only(right: 16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: TColor.cardColor,
+          color: isDarkMode ? TColor.darkSurface : TColor.secondaryColor2.withOpacity(0.1),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: TColor.subTextColor.withAlpha(0),
+              color: TColor.subTextColor.withOpacity(0.1),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -303,10 +304,10 @@ class _HomeViewState extends State<HomeView>
                       },
                       child: CircleAvatar(
                         radius: 20,
-                        backgroundColor: TColor.cardColor,
-                        child: const Icon(
+                        backgroundColor: isDarkMode ? TColor.darkSurface : TColor.secondaryColor2,
+                        child: Icon(
                           Icons.person,
-                          color: Colors.white,
+                          color: isDarkMode ? Colors.white : TColor.textColor,
                           size: 25,
                         ),
                       ),

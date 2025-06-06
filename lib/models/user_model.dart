@@ -191,12 +191,12 @@ class HealthBackground {
 }
 
 class MeasurementContext {
-  final double? weight;
-  final double? height;
-  final bool? hasBPCuff;
-  final String? preferredHand;
-  final bool cameraPermission;
-  final bool flashlightPermission;
+  double? weight;
+  double? height;
+  bool? hasBPCuff;
+  String? preferredHand;
+  bool cameraPermission;
+  bool flashlightPermission;
 
   MeasurementContext({
     this.weight,
@@ -227,5 +227,23 @@ class MeasurementContext {
       'cameraPermission': cameraPermission,
       'flashlightPermission': flashlightPermission,
     };
+  }
+
+  MeasurementContext copyWith({
+    double? weight,
+    double? height,
+    bool? hasBPCuff,
+    String? preferredHand,
+    bool? cameraPermission,
+    bool? flashlightPermission,
+  }) {
+    return MeasurementContext(
+      weight: weight ?? this.weight,
+      height: height ?? this.height,
+      hasBPCuff: hasBPCuff ?? this.hasBPCuff,
+      preferredHand: preferredHand ?? this.preferredHand,
+      cameraPermission: cameraPermission ?? this.cameraPermission,
+      flashlightPermission: flashlightPermission ?? this.flashlightPermission,
+    );
   }
 } 
