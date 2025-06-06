@@ -71,7 +71,9 @@ class _HomeViewState extends State<HomeView>
         .listen((measurements) {
       if (mounted) {
         setState(() {
-          // Assuming the stream provides measurements ordered by timestamp descending
+          // Ensure measurements are sorted by timestamp descending just in case the stream order is not guaranteed,
+          // although MeasurementService already orders it this way.
+          measurements.sort((a, b) => b.timestamp.compareTo(a.timestamp));
           _latestMeasurement = measurements.isNotEmpty ? measurements.first : null;
           _isLoadingMeasurement = false;
         });
