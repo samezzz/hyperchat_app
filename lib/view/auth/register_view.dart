@@ -21,6 +21,8 @@ class _RegisterViewState extends State<RegisterView> {
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _weightController = TextEditingController();
+  final _heightController = TextEditingController();
   DateTime? _selectedDate;
   String? _selectedGender;
   bool _isLoading = false;
@@ -49,6 +51,8 @@ class _RegisterViewState extends State<RegisterView> {
     _passwordController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
+    _weightController.dispose();
+    _heightController.dispose();
     super.dispose();
   }
 
@@ -279,28 +283,12 @@ class _RegisterViewState extends State<RegisterView> {
 
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Please select your date of birth',
-            style: TextStyle(
-              color: TColor.white,
-            ),
-          ),
-          backgroundColor: TColor.primaryColor2,
-        ),
-      );
-      return;
-    }
     if (!_acceptedTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Please accept the Terms of Service',
-            style: TextStyle(
-              color: TColor.white,
-            ),
+            'Please accept the terms and conditions',
+            style: TextStyle(color: TColor.white),
           ),
           backgroundColor: TColor.primaryColor2,
         ),
@@ -308,9 +296,7 @@ class _RegisterViewState extends State<RegisterView> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       // Create user with email and password
@@ -329,8 +315,8 @@ class _RegisterViewState extends State<RegisterView> {
           email: _emailController.text.trim(),
           phoneNumber: _phoneController.text.trim(),
           age: DateTime.now().difference(_selectedDate!).inDays ~/ 365,
-          weight: 0.0,
-          height: 0.0,
+          weight: double.tryParse(_weightController.text) ?? 0.0,
+          height: double.tryParse(_heightController.text) ?? 0.0,
         ),
         healthBackground: HealthBackground(
           hasHypertension: false,
@@ -342,6 +328,8 @@ class _RegisterViewState extends State<RegisterView> {
           activityLevel: '',
         ),
         measurementContext: MeasurementContext(
+          weight: double.tryParse(_weightController.text),
+          height: double.tryParse(_heightController.text),
           cameraPermission: false,
           flashlightPermission: false,
         ),
@@ -355,48 +343,38 @@ class _RegisterViewState extends State<RegisterView> {
         Navigator.pushReplacementNamed(context, '/onboarding');
       }
     } on FirebaseAuthException catch (e) {
-      String message;
-      switch (e.code) {
-        case 'weak-password':
-          message = 'The password provided is too weak.';
-          break;
-        case 'email-already-in-use':
-          message = 'An account already exists for that email.';
-          break;
-        case 'invalid-email':
-          message = 'The email address is not valid.';
-          break;
-        default:
-          message = 'An error occurred. Please try again.';
+      String message = 'An error occurred during registration';
+      if (e.code == 'weak-password') {
+        message = 'The password provided is too weak';
+      } else if (e.code == 'email-already-in-use') {
+        message = 'An account already exists for that email';
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            message,
-            style: TextStyle(
-              color: TColor.white,
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              message,
+              style: TextStyle(color: TColor.white),
             ),
+            backgroundColor: TColor.primaryColor2,
           ),
-          backgroundColor: TColor.primaryColor2,
-        ),
-      );
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'An error occurred. Please try again.',
-            style: TextStyle(
-              color: TColor.white,
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'An error occurred during registration',
+              style: TextStyle(color: TColor.white),
             ),
+            backgroundColor: TColor.primaryColor2,
           ),
-          backgroundColor: TColor.primaryColor2,
-        ),
-      );
+        );
+      }
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -487,6 +465,40 @@ class _RegisterViewState extends State<RegisterView> {
 
                         // Gender
                         _buildGenderDropdown(),
+
+                        // Weight
+                        _buildTextField(
+                          label: "Weight (kg)",
+                          controller: _weightController,
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your weight';
+                            }
+                            final weight = double.tryParse(value);
+                            if (weight == null || weight <= 0) {
+                              return 'Please enter a valid weight';
+                            }
+                            return null;
+                          },
+                        ),
+
+                        // Height
+                        _buildTextField(
+                          label: "Height (cm)",
+                          controller: _heightController,
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your height';
+                            }
+                            final height = double.tryParse(value);
+                            if (height == null || height <= 0) {
+                              return 'Please enter a valid height';
+                            }
+                            return null;
+                          },
+                        ),
 
                         // Password
                         _buildTextField(
