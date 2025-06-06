@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../common/colo_extension.dart';
+import '../../services/gemini_service.dart';
 
 class ChatView extends StatefulWidget {
   const ChatView({super.key});
@@ -11,6 +12,7 @@ class ChatView extends StatefulWidget {
 class _ChatViewState extends State<ChatView> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final GeminiService _geminiService = GeminiService();
   bool _isTyping = false;
 
   final List<Map<String, dynamic>> _suggestedQuestions = [
@@ -40,13 +42,14 @@ class _ChatViewState extends State<ChatView> {
     },
   ];
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     if (_messageController.text.trim().isEmpty) return;
 
+    final userMessage = _messageController.text;
     setState(() {
       _messages.add({
         'isBot': false,
-        'message': _messageController.text,
+        'message': userMessage,
         'timestamp': DateTime.now().toString().substring(11, 16),
       });
       _isTyping = true;
@@ -55,18 +58,20 @@ class _ChatViewState extends State<ChatView> {
     _messageController.clear();
     _scrollToBottom();
 
-    // Simulate bot response
-    Future.delayed(const Duration(seconds: 2), () {
+    // Get response from Gemini
+    final response = await _geminiService.getResponse(userMessage);
+    
+    if (mounted) {
       setState(() {
         _isTyping = false;
         _messages.add({
           'isBot': true,
-          'message': 'I\'m here to help! Let me know if you have any questions about your blood pressure management.',
+          'message': response,
           'timestamp': DateTime.now().toString().substring(11, 16),
         });
       });
       _scrollToBottom();
-    });
+    }
   }
 
   void _scrollToBottom() {

@@ -57,6 +57,7 @@ dependencies:
   camera: ^0.10.5+9
   collection: ^1.18.0
   wakelock_plus: ^1.0.0
+  google_generative_ai: ^0.2.0
 
 dev_dependencies:
   flutter_test:
