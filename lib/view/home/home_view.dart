@@ -103,7 +103,7 @@ class _HomeViewState extends State<HomeView>
       decoration: BoxDecoration(
         color: backgroundColor ?? (isDarkMode ? TColor.darkSurface : TColor.secondaryColor2.withOpacity(0.1)),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
+        boxShadow: isDarkMode ? [] : [
           BoxShadow(
             color: TColor.subTextColor.withOpacity(0.1),
             blurRadius: 10,
