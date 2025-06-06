@@ -5,6 +5,7 @@ import '../../services/measurement_service.dart';
 import '../../model/measurement.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import '../../services/export_service.dart';
 
 class HistoryView extends StatefulWidget {
   const HistoryView({super.key});
@@ -19,6 +20,8 @@ class _HistoryViewState extends State<HistoryView> with SingleTickerProviderStat
   final MeasurementService _measurementService = MeasurementService();
   List<Measurement> _measurements = [];
   bool _isLoading = true;
+  final ExportService _exportService = ExportService();
+  bool _isExporting = false;
 
   @override
   void initState() {
@@ -412,45 +415,75 @@ class _HistoryViewState extends State<HistoryView> with SingleTickerProviderStat
           );
   }
 
+  Future<void> _exportToCSV() async {
+    if (_isExporting) return;
+
+    setState(() {
+      _isExporting = true;
+    });
+
+    try {
+      await _exportService.exportToCSV(_measurements);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to export data: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
+  }
+
   Widget _buildExportTab() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.file_download,
-            size: 64,
-            color: TColor.primaryColor1,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Export your data',
-            style: TextStyle(
-              color: TColor.textColor,
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Download your blood pressure history in CSV format',
-            style: TextStyle(
-              color: TColor.subTextColor,
-            ),
-          ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           ElevatedButton.icon(
-            onPressed: () {
-              // TODO: Implement export functionality
-            },
-            icon: const Icon(Icons.download),
-            label: const Text('Export Data'),
+            onPressed: _isExporting ? null : _exportToCSV,
             style: ElevatedButton.styleFrom(
               backgroundColor: TColor.primaryColor1,
               foregroundColor: TColor.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            icon: _isExporting
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(TColor.white),
+                    ),
+                  )
+                : const Icon(Icons.download),
+            label: Text(
+              _isExporting ? 'Exporting...' : 'Export to CSV',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              'Export your blood pressure measurements to CSV format for easy sharing and analysis.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: TColor.subTextColor,
+                fontSize: 14,
               ),
             ),
           ),
