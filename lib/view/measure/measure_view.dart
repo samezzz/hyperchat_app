@@ -59,7 +59,7 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
     TColor.toggleDarkMode(isDarkMode);
     
     return Scaffold(
-      backgroundColor: isMeasuring ? Colors.black : TColor.bgColor,
+      backgroundColor: TColor.bgColor,
       body: SafeArea(
         child: isMeasuring ? _buildMeasuringView() : _buildResultView(),
       ),
@@ -70,7 +70,7 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
     return Container(
       width: double.infinity,
       height: double.infinity,
-      color: Colors.black,
+      color: TColor.bgColor,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -116,8 +116,8 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
           Text(
             "Measuring... ${(measurementProgress * 100).toInt()}%",
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: TColor.textColor,
               fontSize: 24,
               fontWeight: FontWeight.w600,
             ),
@@ -127,7 +127,7 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
             "Hold steady",
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withAlpha(179),
+              color: TColor.subTextColor,
               fontSize: 16,
             ),
           ),
