@@ -592,24 +592,26 @@ class _HomeViewState extends State<HomeView>
                                 ),
                                 const SizedBox(height: 8),
                                 _isLoadingMeasurement
-                                    ? CircularProgressIndicator(color: TColor.primaryColor1)
+                                    ? CircularProgressIndicator(
+                                        color: TColor.primaryColor1,
+                                      )
                                     : _latestMeasurement == null
-                                        ? Text(
-                                            'No data',
-                                            style: TextStyle(
-                                              color: TColor.textColor,
-                                              fontSize: 20,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          )
-                                        : Text(
-                                            '${_latestMeasurement!.systolicBP}/${_latestMeasurement!.diastolicBP}',
-                                            style: TextStyle(
-                                              color: TColor.textColor,
-                                              fontSize: 20,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
+                                    ? Text(
+                                        'No data',
+                                        style: TextStyle(
+                                          color: TColor.textColor,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      )
+                                    : Text(
+                                        '${_latestMeasurement!.systolicBP}/${_latestMeasurement!.diastolicBP}',
+                                        style: TextStyle(
+                                          color: TColor.textColor,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
                                 Text(
                                   'mmHg',
                                   style: TextStyle(
@@ -636,24 +638,27 @@ class _HomeViewState extends State<HomeView>
                                 ),
                                 const SizedBox(height: 8),
                                 _isLoadingMeasurement
-                                    ? CircularProgressIndicator(color: TColor.primaryColor1)
+                                    ? CircularProgressIndicator(
+                                        color: TColor.primaryColor1,
+                                      )
                                     : _latestMeasurement == null
-                                        ? Text(
-                                            'No data',
-                                            style: TextStyle(
-                                              color: TColor.textColor,
-                                              fontSize: 20,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          )
-                                        : Text(
-                                            _latestMeasurement!.heartRate.toString(),
-                                            style: TextStyle(
-                                              color: TColor.textColor,
-                                              fontSize: 20,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
+                                    ? Text(
+                                        'No data',
+                                        style: TextStyle(
+                                          color: TColor.textColor,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      )
+                                    : Text(
+                                        _latestMeasurement!.heartRate
+                                            .toString(),
+                                        style: TextStyle(
+                                          color: TColor.textColor,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
                                 Text(
                                   'BPM',
                                   style: TextStyle(

@@ -151,7 +151,7 @@ class _MainTabViewState extends State<MainTabView> {
           child: Icon(
             icon,
             color: isSelected ? TColor.primaryColor1 : TColor.subTextColor,
-            size: 28,
+            size: 30,
           ),
         ),
       ),
