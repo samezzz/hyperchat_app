@@ -115,8 +115,8 @@ class _ChatViewState extends State<ChatView> {
                   'HyperBot',
                   style: TextStyle(
                     color: TColor.textColor,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
                 Text(

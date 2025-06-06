@@ -68,29 +68,34 @@ class _HomeViewState extends State<HomeView>
 
     _measurementSubscription = _measurementService
         .getUserMeasurements(user.uid)
-        .listen((measurements) {
-      if (mounted) {
-        setState(() {
-          // Ensure measurements are sorted by timestamp descending just in case the stream order is not guaranteed,
-          // although MeasurementService already orders it this way.
-          measurements.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-          _latestMeasurement = measurements.isNotEmpty ? measurements.first : null;
-          _isLoadingMeasurement = false;
-        });
-      }
-    }, onError: (error) {
-      if (mounted) {
-        setState(() {
-          _isLoadingMeasurement = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to fetch latest measurement: $error'),
-            backgroundColor: Colors.red,
-          ),
+        .listen(
+          (measurements) {
+            if (mounted) {
+              setState(() {
+                // Ensure measurements are sorted by timestamp descending just in case the stream order is not guaranteed,
+                // although MeasurementService already orders it this way.
+                measurements.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+                _latestMeasurement = measurements.isNotEmpty
+                    ? measurements.first
+                    : null;
+                _isLoadingMeasurement = false;
+              });
+            }
+          },
+          onError: (error) {
+            if (mounted) {
+              setState(() {
+                _isLoadingMeasurement = false;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Failed to fetch latest measurement: $error'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          },
         );
-      }
-    });
   }
 
   List<Map<String, dynamic>> _getLearningModules(BuildContext context) {
@@ -147,15 +152,21 @@ class _HomeViewState extends State<HomeView>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: backgroundColor ?? (isDarkMode ? TColor.darkSurface : TColor.secondaryColor2.withOpacity(0.1)),
+        color:
+            backgroundColor ??
+            (isDarkMode
+                ? TColor.darkSurface
+                : TColor.secondaryColor2.withOpacity(0.1)),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: isDarkMode ? [] : [
-          BoxShadow(
-            color: TColor.subTextColor.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: isDarkMode
+            ? []
+            : [
+                BoxShadow(
+                  color: TColor.subTextColor.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
       ),
       child: child,
     );
@@ -251,7 +262,9 @@ class _HomeViewState extends State<HomeView>
         margin: const EdgeInsets.only(right: 16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isDarkMode ? TColor.darkSurface : TColor.secondaryColor2.withOpacity(0.1),
+          color: isDarkMode
+              ? TColor.darkSurface
+              : TColor.secondaryColor2.withOpacity(0.1),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
@@ -311,40 +324,40 @@ class _HomeViewState extends State<HomeView>
         ),
         const SizedBox(height: 16),
         _isLoadingMeasurement
-            ? Center(child: CircularProgressIndicator(color: TColor.primaryColor1,))
+            ? Center(
+                child: CircularProgressIndicator(color: TColor.primaryColor1),
+              )
             : _latestMeasurement == null
-                ? Center(
-                    child: Text(
-                      'No measurements recorded yet.',
-                      style: TextStyle(
-                        color: TColor.subTextColor,
-                        fontSize: 16,
-                      ),
+            ? Center(
+                child: Text(
+                  'No measurements recorded yet.',
+                  style: TextStyle(color: TColor.subTextColor, fontSize: 16),
+                ),
+              )
+            : SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    _buildReadingCard(
+                      title: 'Blood Pressure',
+                      value:
+                          '${_latestMeasurement!.systolicBP}/${_latestMeasurement!.diastolicBP}',
+                      unit: 'mmHg',
+                      icon: Icons.favorite,
+                      color: TColor.primaryColor1,
                     ),
-                  )
-                : SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      children: [
-                        _buildReadingCard(
-                          title: 'Blood Pressure',
-                          value: '${_latestMeasurement!.systolicBP}/${_latestMeasurement!.diastolicBP}',
-                          unit: 'mmHg',
-                          icon: Icons.favorite,
-                          color: TColor.primaryColor1,
-                        ),
-                        _buildReadingCard(
-                          title: 'Heart Rate',
-                          value: _latestMeasurement!.heartRate.toString(),
-                          unit: 'bpm',
-                          icon: Icons.favorite_border,
-                          color: TColor.secondaryColor1,
-                          isPulsating: true,
-                        ),
-                      ],
+                    _buildReadingCard(
+                      title: 'Heart Rate',
+                      value: _latestMeasurement!.heartRate.toString(),
+                      unit: 'bpm',
+                      icon: Icons.favorite_border,
+                      color: TColor.secondaryColor1,
+                      isPulsating: true,
                     ),
-                  ),
+                  ],
+                ),
+              ),
       ],
     );
   }
@@ -445,13 +458,12 @@ class _HomeViewState extends State<HomeView>
                             fontSize: 16,
                           ),
                         ),
-                        const SizedBox(height: 4),
                         Text(
                           user?.basicInfo.fullName ?? 'Loading...',
                           style: TextStyle(
                             color: TColor.textColor,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 34,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ],
@@ -467,7 +479,9 @@ class _HomeViewState extends State<HomeView>
                       },
                       child: CircleAvatar(
                         radius: 20,
-                        backgroundColor: isDarkMode ? TColor.darkSurface : TColor.secondaryColor2,
+                        backgroundColor: isDarkMode
+                            ? TColor.darkSurface
+                            : TColor.secondaryColor2,
                         child: Icon(
                           Icons.person,
                           color: isDarkMode ? Colors.white : TColor.textColor,
