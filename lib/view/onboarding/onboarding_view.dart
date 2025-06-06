@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:camera/camera.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../common/colo_extension.dart';
 import '../main_tab/main_tab_view.dart';
+import '../../models/user_model.dart';
 
 class OnboardingView extends StatefulWidget {
   const OnboardingView({super.key});
@@ -54,6 +57,16 @@ class _OnboardingViewState extends State<OnboardingView> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // Set default values for dropdowns
+    _smokingHabits = _habits[0];
+    _drinkingHabits = _habits[0];
+    _activityLevel = _activityLevels[0];
+    _preferredHand = 'Right';
+  }
+
+  @override
   void dispose() {
     _medicationsController.dispose();
     _weightController.dispose();
@@ -88,23 +101,128 @@ class _OnboardingViewState extends State<OnboardingView> {
     }
   }
 
-  void _saveQuestionnaireAnswers() {
-    // TODO: Implement saving questionnaire answers to user profile
-    print('Saving questionnaire answers:');
-    print('Hypertension Status: $_hypertensionStatus');
-    print('Diagnosis Date: $_diagnosisDate');
-    print('Medications: ${_medicationsController.text}');
-    print('Family History: $_hasFamilyHistory');
-    print('Conditions: $_selectedConditions');
-    print('Smoking Habits: $_smokingHabits');
-    print('Drinking Habits: $_drinkingHabits');
-    print('Activity Level: $_activityLevel');
-    print('Weight: ${_weightController.text}');
-    print('Height: ${_heightController.text}');
-    print('Has BP Cuff: $_hasBPCuff');
-    print('Preferred Hand: $_preferredHand');
-    print('Camera Permission: $_cameraPermission');
-    print('Flashlight Permission: $_flashlightPermission');
+  Future<void> _saveQuestionnaireAnswers() async {
+    // Parse weight and height values
+    final weight = double.tryParse(_weightController.text);
+    final height = double.tryParse(_heightController.text);
+
+    // Validate weight and height
+    if (weight == null || weight <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Please enter a valid weight value',
+            style: TextStyle(color: TColor.white),
+          ),
+          backgroundColor: TColor.primaryColor2,
+        ),
+      );
+      return;
+    }
+
+    if (height == null || height <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Please enter a valid height value',
+            style: TextStyle(color: TColor.white),
+          ),
+          backgroundColor: TColor.primaryColor2,
+        ),
+      );
+      return;
+    }
+
+    // Get current user
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'You must be logged in to save your information',
+            style: TextStyle(color: TColor.white),
+          ),
+          backgroundColor: TColor.primaryColor2,
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Get existing user data
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      Map<String, dynamic>? existingData;
+      if (userDoc.exists) {
+        existingData = userDoc.data();
+      }
+
+      // Create the user model with the parsed values
+      final userModel = UserModel(
+        id: user.uid,
+        basicInfo: BasicInfo(
+          fullName: existingData?['basicInfo']?['fullName'] ?? '',
+          dateOfBirth: existingData?['basicInfo']?['dateOfBirth'] != null 
+              ? (existingData!['basicInfo']!['dateOfBirth'] as Timestamp).toDate()
+              : DateTime.now(),
+          gender: existingData?['basicInfo']?['gender'] ?? '',
+          email: existingData?['basicInfo']?['email'] ?? '',
+          phoneNumber: existingData?['basicInfo']?['phoneNumber'],
+          age: existingData?['basicInfo']?['age'] ?? 0,
+          weight: weight,
+          height: height,
+        ),
+        healthBackground: HealthBackground(
+          hasHypertension: _hypertensionStatus == 'Yes',
+          diagnosisDate: _diagnosisDate,
+          medications: _medicationsController.text.split(',').map((e) => e.trim()).toList(),
+          familyHistory: _hasFamilyHistory ?? false,
+          conditions: _selectedConditions,
+          smokingHabits: _smokingHabits ?? _habits[0],
+          drinkingHabits: _drinkingHabits ?? _habits[0],
+          activityLevel: _activityLevel ?? _activityLevels[0],
+        ),
+        measurementContext: MeasurementContext(
+          weight: weight,
+          height: height,
+          hasBPCuff: _hasBPCuff,
+          preferredHand: _preferredHand ?? 'Right',
+          cameraPermission: _cameraPermission,
+          flashlightPermission: _flashlightPermission,
+        ),
+      );
+
+      // Save to Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .set(userModel.toMap());
+
+      // Navigate to main tab view
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const MainTabView(),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to save your information: $e',
+              style: TextStyle(color: TColor.white),
+            ),
+            backgroundColor: TColor.primaryColor2,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _requestCameraPermission() async {
@@ -393,7 +511,7 @@ class _OnboardingViewState extends State<OnboardingView> {
               // Smoking Habits
               _buildQuestionTitle('What are your smoking habits?'),
               DropdownButtonFormField<String>(
-                value: _smokingHabits,
+                value: _smokingHabits ?? _habits[0],
                 decoration: InputDecoration(
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -407,9 +525,11 @@ class _OnboardingViewState extends State<OnboardingView> {
                   );
                 }).toList(),
                 onChanged: (value) {
-                  setState(() {
-                    _smokingHabits = value;
-                  });
+                  if (value != null) {
+                    setState(() {
+                      _smokingHabits = value;
+                    });
+                  }
                 },
                 dropdownColor: TColor.bgColor,
                 style: TextStyle(color: TColor.textColor),
@@ -418,7 +538,7 @@ class _OnboardingViewState extends State<OnboardingView> {
               // Drinking Habits
               _buildQuestionTitle('What are your drinking habits?'),
               DropdownButtonFormField<String>(
-                value: _drinkingHabits,
+                value: _drinkingHabits ?? _habits[0],
                 decoration: InputDecoration(
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -432,9 +552,11 @@ class _OnboardingViewState extends State<OnboardingView> {
                   );
                 }).toList(),
                 onChanged: (value) {
-                  setState(() {
-                    _drinkingHabits = value;
-                  });
+                  if (value != null) {
+                    setState(() {
+                      _drinkingHabits = value;
+                    });
+                  }
                 },
                 dropdownColor: TColor.bgColor,
                 style: TextStyle(color: TColor.textColor),
@@ -443,7 +565,7 @@ class _OnboardingViewState extends State<OnboardingView> {
               // Activity Level
               _buildQuestionTitle('What is your activity level?'),
               DropdownButtonFormField<String>(
-                value: _activityLevel,
+                value: _activityLevel ?? _activityLevels[0],
                 decoration: InputDecoration(
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -457,9 +579,11 @@ class _OnboardingViewState extends State<OnboardingView> {
                   );
                 }).toList(),
                 onChanged: (value) {
-                  setState(() {
-                    _activityLevel = value;
-                  });
+                  if (value != null) {
+                    setState(() {
+                      _activityLevel = value;
+                    });
+                  }
                 },
                 dropdownColor: TColor.bgColor,
                 style: TextStyle(color: TColor.textColor),
@@ -661,13 +785,7 @@ class _OnboardingViewState extends State<OnboardingView> {
                       return;
                     }
                     _saveQuestionnaireAnswers();
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const MainTabView(),
-                      ),
-                    );
-                              },
+                  },
                               style: ElevatedButton.styleFrom(
                     backgroundColor: TColor.primaryColor1,
                     foregroundColor: TColor.white,

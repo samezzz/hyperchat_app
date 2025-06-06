@@ -36,30 +36,30 @@ class _EditProfileViewState extends State<EditProfileView> {
 
   final List<String> _genders = ['Male', 'Female', 'Other'];
   final List<String> _conditions = [
-    'Hypertension',
     'Diabetes',
+    'Chronic Kidney Disease',
     'Heart Disease',
-    'Kidney Disease',
-    'None',
+    'High Cholesterol',
+    'Sleep Apnea',
+    'Other'
   ];
   final List<String> _smokingOptions = [
-    'Never smoked',
-    'Former smoker',
-    'Occasional smoker',
-    'Regular smoker',
+    'Never',
+    'Occasionally',
+    'Regularly',
+    'Heavily'
   ];
   final List<String> _drinkingOptions = [
-    'Never drink',
-    'Occasional drinker',
-    'Regular drinker',
-    'Heavy drinker',
+    'Never',
+    'Occasionally',
+    'Regularly',
+    'Heavily'
   ];
   final List<String> _activityLevels = [
     'Sedentary',
-    'Lightly active',
-    'Moderately active',
-    'Very active',
-    'Extremely active',
+    'Lightly Active',
+    'Moderately Active',
+    'Very Active'
   ];
 
   @override
@@ -83,7 +83,7 @@ class _EditProfileViewState extends State<EditProfileView> {
     _heightController = TextEditingController(
       text: widget.user.basicInfo.height.toString(),
     );
-    _selectedGender = widget.user.basicInfo.gender;
+    _selectedGender = widget.user.basicInfo.gender.isEmpty ? _genders[0] : widget.user.basicInfo.gender;
     _hasHypertension = widget.user.healthBackground.hasHypertension;
     _hasFamilyHistory = widget.user.healthBackground.familyHistory;
     _selectedConditions = List<String>.from(
