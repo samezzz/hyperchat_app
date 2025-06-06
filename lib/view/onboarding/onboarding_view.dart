@@ -1,0 +1,634 @@
+import 'package:flutter/material.dart';
+import '../../common/colo_extension.dart';
+import '../main_tab/main_tab_view.dart';
+
+class OnboardingView extends StatefulWidget {
+  const OnboardingView({super.key});
+
+  @override
+  State<OnboardingView> createState() => _OnboardingViewState();
+}
+
+class _OnboardingViewState extends State<OnboardingView> {
+  // Health Background
+  String? _hypertensionStatus; // Yes, No, Not sure
+  DateTime? _diagnosisDate;
+  final _medicationsController = TextEditingController();
+  bool? _hasFamilyHistory;
+  final List<String> _selectedConditions = [];
+  String? _smokingHabits;
+  String? _drinkingHabits;
+  String? _activityLevel;
+
+  // Measurement Context
+  final _weightController = TextEditingController();
+  final _heightController = TextEditingController();
+  bool? _hasBPCuff;
+  String? _preferredHand;
+  bool _cameraPermission = false;
+  bool _flashlightPermission = false;
+
+  final List<String> _conditions = [
+    'Diabetes',
+    'Chronic Kidney Disease',
+    'Heart Disease',
+    'High Cholesterol',
+    'Sleep Apnea',
+    'Other'
+  ];
+
+  final List<String> _activityLevels = [
+    'Sedentary',
+    'Lightly Active',
+    'Moderately Active',
+    'Very Active'
+  ];
+
+  final List<String> _habits = [
+    'Never',
+    'Occasionally',
+    'Regularly',
+    'Heavily'
+  ];
+
+  @override
+  void dispose() {
+    _medicationsController.dispose();
+    _weightController.dispose();
+    _heightController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: TColor.primaryColor1,
+              onPrimary: TColor.white,
+              surface: TColor.bgColor,
+              onSurface: TColor.textColor,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && picked != _diagnosisDate) {
+      setState(() {
+        _diagnosisDate = picked;
+      });
+    }
+  }
+
+  void _saveQuestionnaireAnswers() {
+    // TODO: Implement saving questionnaire answers to user profile
+    print('Saving questionnaire answers:');
+    print('Hypertension Status: $_hypertensionStatus');
+    print('Diagnosis Date: $_diagnosisDate');
+    print('Medications: ${_medicationsController.text}');
+    print('Family History: $_hasFamilyHistory');
+    print('Conditions: $_selectedConditions');
+    print('Smoking Habits: $_smokingHabits');
+    print('Drinking Habits: $_drinkingHabits');
+    print('Activity Level: $_activityLevel');
+    print('Weight: ${_weightController.text}');
+    print('Height: ${_heightController.text}');
+    print('Has BP Cuff: $_hasBPCuff');
+    print('Preferred Hand: $_preferredHand');
+    print('Camera Permission: $_cameraPermission');
+    print('Flashlight Permission: $_flashlightPermission');
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24, bottom: 16),
+      child: Text(
+        title,
+        style: TextStyle(
+          color: TColor.textColor,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuestionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16, bottom: 8),
+      child: Text(
+        title,
+        style: TextStyle(
+          color: TColor.textColor,
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    TColor.toggleDarkMode(isDarkMode);
+    
+    return Scaffold(
+      backgroundColor: TColor.bgColor,
+      appBar: AppBar(
+        backgroundColor: TColor.bgColor,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        title: Text(
+          'Health Questionnaire',
+          style: TextStyle(
+            color: TColor.textColor,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Please answer these questions to help us provide better care.',
+                style: TextStyle(
+                  color: TColor.subTextColor,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Health Background Section
+              _buildSectionTitle('Health Background'),
+
+              // Hypertension Status
+              _buildQuestionTitle('Do you have hypertension?'),
+              Row(
+                children: [
+                  Expanded(
+                    child: RadioListTile<String>(
+                      title: Text('Yes', style: TextStyle(color: TColor.textColor)),
+                      value: 'Yes',
+                      groupValue: _hypertensionStatus,
+                      onChanged: (value) {
+                        setState(() {
+                          _hypertensionStatus = value;
+                        });
+                      },
+                      activeColor: TColor.primaryColor1,
+                    ),
+                  ),
+                  Expanded(
+                    child: RadioListTile<String>(
+                      title: Text('No', style: TextStyle(color: TColor.textColor)),
+                      value: 'No',
+                      groupValue: _hypertensionStatus,
+                      onChanged: (value) {
+                        setState(() {
+                          _hypertensionStatus = value;
+                        });
+                      },
+                      activeColor: TColor.primaryColor1,
+                    ),
+                  ),
+                  Expanded(
+                    child: RadioListTile<String>(
+                      title: Text('Not sure', style: TextStyle(color: TColor.textColor)),
+                      value: 'Not sure',
+                      groupValue: _hypertensionStatus,
+                      onChanged: (value) {
+                        setState(() {
+                          _hypertensionStatus = value;
+                        });
+                      },
+                      activeColor: TColor.primaryColor1,
+                    ),
+                  ),
+                ],
+              ),
+
+              // Diagnosis Date (if Yes)
+              if (_hypertensionStatus == 'Yes') ...[
+                _buildQuestionTitle('When were you diagnosed?'),
+                GestureDetector(
+                  onTap: () => _selectDate(context),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: TColor.subTextColor.withAlpha(77),
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _diagnosisDate == null
+                              ? "Select date"
+                              : "${_diagnosisDate!.day}/${_diagnosisDate!.month}/${_diagnosisDate!.year}",
+                          style: TextStyle(
+                            color: _diagnosisDate == null
+                                ? TColor.subTextColor.withAlpha(128)
+                                : TColor.textColor,
+                          ),
+                        ),
+                        Icon(
+                          Icons.calendar_today,
+                          size: 20,
+                          color: TColor.subTextColor,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+
+              // Medications
+              _buildQuestionTitle('Are you on any medications? (Optional)'),
+              TextFormField(
+                controller: _medicationsController,
+                style: TextStyle(color: TColor.textColor),
+                decoration: InputDecoration(
+                  hintText: "List your medications",
+                  hintStyle: TextStyle(color: TColor.subTextColor.withAlpha(128)),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: TColor.subTextColor.withAlpha(77),
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: TColor.subTextColor.withAlpha(77),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: TColor.primaryColor1,
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+
+              // Family History
+              _buildQuestionTitle('Do you have a family history of hypertension?'),
+              Row(
+                children: [
+                  Expanded(
+                    child: RadioListTile<bool>(
+                      title: Text('Yes', style: TextStyle(color: TColor.textColor)),
+                      value: true,
+                      groupValue: _hasFamilyHistory,
+                      onChanged: (value) {
+                        setState(() {
+                          _hasFamilyHistory = value;
+                        });
+                      },
+                      activeColor: TColor.primaryColor1,
+                    ),
+                  ),
+                  Expanded(
+                    child: RadioListTile<bool>(
+                      title: Text('No', style: TextStyle(color: TColor.textColor)),
+                      value: false,
+                      groupValue: _hasFamilyHistory,
+                      onChanged: (value) {
+                        setState(() {
+                          _hasFamilyHistory = value;
+                        });
+                      },
+                      activeColor: TColor.primaryColor1,
+                    ),
+                  ),
+                ],
+              ),
+
+              // Other Conditions
+              _buildQuestionTitle('Do you have any of these conditions?'),
+              ..._conditions.map((condition) => CheckboxListTile(
+                    title: Text(condition, style: TextStyle(color: TColor.textColor)),
+                    value: _selectedConditions.contains(condition),
+                    onChanged: (value) {
+                      setState(() {
+                        if (value == true) {
+                          _selectedConditions.add(condition);
+                        } else {
+                          _selectedConditions.remove(condition);
+                        }
+                      });
+                    },
+                    activeColor: TColor.primaryColor1,
+                    checkColor: TColor.white,
+                  )),
+
+              // Lifestyle Section
+              _buildSectionTitle('Lifestyle'),
+
+              // Smoking Habits
+              _buildQuestionTitle('What are your smoking habits?'),
+              DropdownButtonFormField<String>(
+                value: _smokingHabits,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ),
+                items: _habits.map((String habit) {
+                  return DropdownMenuItem<String>(
+                    value: habit,
+                    child: Text(habit, style: TextStyle(color: TColor.textColor)),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _smokingHabits = value;
+                  });
+                },
+                dropdownColor: TColor.bgColor,
+                style: TextStyle(color: TColor.textColor),
+              ),
+
+              // Drinking Habits
+              _buildQuestionTitle('What are your drinking habits?'),
+              DropdownButtonFormField<String>(
+                value: _drinkingHabits,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ),
+                items: _habits.map((String habit) {
+                  return DropdownMenuItem<String>(
+                    value: habit,
+                    child: Text(habit, style: TextStyle(color: TColor.textColor)),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _drinkingHabits = value;
+                  });
+                },
+                dropdownColor: TColor.bgColor,
+                style: TextStyle(color: TColor.textColor),
+              ),
+
+              // Activity Level
+              _buildQuestionTitle('What is your activity level?'),
+              DropdownButtonFormField<String>(
+                value: _activityLevel,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ),
+                items: _activityLevels.map((String level) {
+                  return DropdownMenuItem<String>(
+                    value: level,
+                    child: Text(level, style: TextStyle(color: TColor.textColor)),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _activityLevel = value;
+                  });
+                },
+                dropdownColor: TColor.bgColor,
+                style: TextStyle(color: TColor.textColor),
+              ),
+
+              // Measurement Context Section
+              _buildSectionTitle('Measurement Context'),
+
+              // Weight
+              _buildQuestionTitle('What is your weight? (kg)'),
+              TextFormField(
+                controller: _weightController,
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: TColor.textColor),
+                decoration: InputDecoration(
+                  hintText: "Enter your weight",
+                  hintStyle: TextStyle(color: TColor.subTextColor.withAlpha(128)),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: TColor.subTextColor.withAlpha(77),
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: TColor.subTextColor.withAlpha(77),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: TColor.primaryColor1,
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+
+              // Height
+              _buildQuestionTitle('What is your height? (cm)'),
+              TextFormField(
+                controller: _heightController,
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: TColor.textColor),
+                decoration: InputDecoration(
+                  hintText: "Enter your height",
+                  hintStyle: TextStyle(color: TColor.subTextColor.withAlpha(128)),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: TColor.subTextColor.withAlpha(77),
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: TColor.subTextColor.withAlpha(77),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: TColor.primaryColor1,
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+
+              // BP Cuff
+              _buildQuestionTitle('Do you have access to a BP cuff?'),
+              Row(
+                children: [
+                  Expanded(
+                    child: RadioListTile<bool>(
+                      title: Text('Yes', style: TextStyle(color: TColor.textColor)),
+                      value: true,
+                      groupValue: _hasBPCuff,
+                      onChanged: (value) {
+                        setState(() {
+                          _hasBPCuff = value;
+                        });
+                      },
+                      activeColor: TColor.primaryColor1,
+                    ),
+                  ),
+                  Expanded(
+                    child: RadioListTile<bool>(
+                      title: Text('No', style: TextStyle(color: TColor.textColor)),
+                      value: false,
+                      groupValue: _hasBPCuff,
+                      onChanged: (value) {
+                        setState(() {
+                          _hasBPCuff = value;
+                        });
+                      },
+                      activeColor: TColor.primaryColor1,
+                    ),
+                  ),
+                ],
+              ),
+
+              // Preferred Hand
+              _buildQuestionTitle('Which hand do you prefer for BP readings?'),
+              Row(
+                children: [
+                  Expanded(
+                    child: RadioListTile<String>(
+                      title: Text('Left', style: TextStyle(color: TColor.textColor)),
+                      value: 'Left',
+                      groupValue: _preferredHand,
+                      onChanged: (value) {
+                        setState(() {
+                          _preferredHand = value;
+                        });
+                      },
+                      activeColor: TColor.primaryColor1,
+                    ),
+                  ),
+                  Expanded(
+                    child: RadioListTile<String>(
+                      title: Text('Right', style: TextStyle(color: TColor.textColor)),
+                      value: 'Right',
+                      groupValue: _preferredHand,
+                      onChanged: (value) {
+                        setState(() {
+                          _preferredHand = value;
+                        });
+                      },
+                      activeColor: TColor.primaryColor1,
+                    ),
+                  ),
+                ],
+              ),
+
+              // Permissions
+              _buildQuestionTitle('Required Permissions'),
+              CheckboxListTile(
+                title: Text('Camera Permission', style: TextStyle(color: TColor.textColor)),
+                subtitle: Text(
+                  'Required for PPG measurements',
+                  style: TextStyle(color: TColor.subTextColor),
+                ),
+                value: _cameraPermission,
+                onChanged: (value) {
+                  setState(() {
+                    _cameraPermission = value ?? false;
+                  });
+                },
+                activeColor: TColor.primaryColor1,
+                checkColor: TColor.white,
+              ),
+              CheckboxListTile(
+                title: Text('Flashlight Permission', style: TextStyle(color: TColor.textColor)),
+                subtitle: Text(
+                  'Required for PPG measurements',
+                  style: TextStyle(color: TColor.subTextColor),
+                ),
+                value: _flashlightPermission,
+                onChanged: (value) {
+                  setState(() {
+                    _flashlightPermission = value ?? false;
+                  });
+                },
+                activeColor: TColor.primaryColor1,
+                checkColor: TColor.white,
+              ),
+
+              const SizedBox(height: 32),
+
+              // Submit Button
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () {
+                    if (_hypertensionStatus == null || _activityLevel == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Please fill in all required fields',
+                            style: TextStyle(color: TColor.white),
+                          ),
+                          backgroundColor: TColor.primaryColor2,
+                        ),
+                      );
+                      return;
+                    }
+                    _saveQuestionnaireAnswers();
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const MainTabView(),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: TColor.primaryColor1,
+                    foregroundColor: TColor.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Complete Questionnaire',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

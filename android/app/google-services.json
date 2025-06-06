@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "978869037890",
+    "project_id": "ppg-app-3",
+    "storage_bucket": "ppg-app-3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:978869037890:android:26bb1e64d41e09dc63f6db",
+        "android_client_info": {
+          "package_name": "com.samess.hyperchat_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "978869037890-mn1pl3dqijaaupbv64svm6g0uqkv2fq3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDQyiVjNeZ5oPipjkXpNGbaRBZV9Y_ja3Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "978869037890-mn1pl3dqijaaupbv64svm6g0uqkv2fq3.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "978869037890-hda6u52q3335de3mtob5vvjl034ujloj.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.ppgApp3"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
