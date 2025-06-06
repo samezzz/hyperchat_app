@@ -123,6 +123,10 @@ class _MeasureResultViewState extends State<MeasureResultView> {
       );
 
       if (mounted) {
+        // First call onSave callback
+        widget.onSave();
+        
+        // Then show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -142,7 +146,11 @@ class _MeasureResultViewState extends State<MeasureResultView> {
             duration: const Duration(seconds: 2),
           ),
         );
-        widget.onSave();
+
+        // Finally, pop back to home view
+        if (mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -166,7 +174,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
           ),
         );
       }
-    } finally {
+    
       if (mounted) {
         setState(() {
           _isSaving = false;

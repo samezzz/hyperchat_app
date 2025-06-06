@@ -66,14 +66,14 @@ class _HomeViewState extends State<HomeView>
       return;
     }
 
+    _measurementSubscription?.cancel(); // Cancel any existing subscription
     _measurementSubscription = _measurementService
         .getUserMeasurements(user.uid)
         .listen(
           (measurements) {
             if (mounted) {
               setState(() {
-                // Ensure measurements are sorted by timestamp descending just in case the stream order is not guaranteed,
-                // although MeasurementService already orders it this way.
+                // Ensure measurements are sorted by timestamp descending
                 measurements.sort((a, b) => b.timestamp.compareTo(a.timestamp));
                 _latestMeasurement = measurements.isNotEmpty
                     ? measurements.first
