@@ -21,8 +21,6 @@ class _RegisterViewState extends State<RegisterView> {
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _weightController = TextEditingController();
-  final _heightController = TextEditingController();
   DateTime? _selectedDate;
   String? _selectedGender;
   bool _isLoading = false;
@@ -51,8 +49,6 @@ class _RegisterViewState extends State<RegisterView> {
     _passwordController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
-    _weightController.dispose();
-    _heightController.dispose();
     super.dispose();
   }
 
@@ -315,8 +311,8 @@ class _RegisterViewState extends State<RegisterView> {
           email: _emailController.text.trim(),
           phoneNumber: _phoneController.text.trim(),
           age: DateTime.now().difference(_selectedDate!).inDays ~/ 365,
-          weight: double.tryParse(_weightController.text) ?? 0.0,
-          height: double.tryParse(_heightController.text) ?? 0.0,
+          weight: 0.0, // Will be updated in onboarding
+          height: 0.0, // Will be updated in onboarding
         ),
         healthBackground: HealthBackground(
           hasHypertension: false,
@@ -328,8 +324,6 @@ class _RegisterViewState extends State<RegisterView> {
           activityLevel: '',
         ),
         measurementContext: MeasurementContext(
-          weight: double.tryParse(_weightController.text),
-          height: double.tryParse(_heightController.text),
           cameraPermission: false,
           flashlightPermission: false,
         ),
@@ -465,40 +459,6 @@ class _RegisterViewState extends State<RegisterView> {
 
                         // Gender
                         _buildGenderDropdown(),
-
-                        // Weight
-                        _buildTextField(
-                          label: "Weight (kg)",
-                          controller: _weightController,
-                          keyboardType: TextInputType.number,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your weight';
-                            }
-                            final weight = double.tryParse(value);
-                            if (weight == null || weight <= 0) {
-                              return 'Please enter a valid weight';
-                            }
-                            return null;
-                          },
-                        ),
-
-                        // Height
-                        _buildTextField(
-                          label: "Height (cm)",
-                          controller: _heightController,
-                          keyboardType: TextInputType.number,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your height';
-                            }
-                            final height = double.tryParse(value);
-                            if (height == null || height <= 0) {
-                              return 'Please enter a valid height';
-                            }
-                            return null;
-                          },
-                        ),
 
                         // Password
                         _buildTextField(

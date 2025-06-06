@@ -50,7 +50,7 @@ class _MainTabViewState extends State<MainTabView> {
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: isDarkMode ? TColor.black : TColor.white,
+          color: isDarkMode ? Color.fromARGB(255, 111, 78, 44) : Color.fromARGB(255, 255, 238, 220),
           boxShadow: [
             BoxShadow(
               color: TColor.black.withAlpha(13),

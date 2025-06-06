@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:camera/camera.dart';
 import '../../common/colo_extension.dart';
 import '../main_tab/main_tab_view.dart';
 
@@ -103,6 +105,55 @@ class _OnboardingViewState extends State<OnboardingView> {
     print('Preferred Hand: $_preferredHand');
     print('Camera Permission: $_cameraPermission');
     print('Flashlight Permission: $_flashlightPermission');
+  }
+
+  Future<void> _requestCameraPermission() async {
+    final status = await Permission.camera.request();
+    setState(() {
+      _cameraPermission = status.isGranted;
+    });
+
+    if (status.isGranted) {
+      // If camera permission is granted, also request flashlight permission
+      final flashlightStatus = await Permission.camera.request();
+      setState(() {
+        _flashlightPermission = flashlightStatus.isGranted;
+      });
+    } else {
+      // Show a message if permission is denied
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Camera permission is required for measurements',
+              style: TextStyle(color: TColor.white),
+            ),
+            backgroundColor: TColor.primaryColor2,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _requestFlashlightPermission() async {
+    // Flashlight permission is tied to camera permission
+    final status = await Permission.camera.request();
+    setState(() {
+      _flashlightPermission = status.isGranted;
+      _cameraPermission = status.isGranted; // Update camera permission too
+    });
+
+    if (!status.isGranted && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Camera permission is required for flashlight access',
+            style: TextStyle(color: TColor.white),
+          ),
+          backgroundColor: TColor.primaryColor2,
+        ),
+      );
+    }
   }
 
   Widget _buildSectionTitle(String title) {
@@ -556,10 +607,15 @@ class _OnboardingViewState extends State<OnboardingView> {
                   style: TextStyle(color: TColor.subTextColor),
                 ),
                 value: _cameraPermission,
-                onChanged: (value) {
-                  setState(() {
-                    _cameraPermission = value ?? false;
-                  });
+                onChanged: (value) async {
+                  if (value == true) {
+                    await _requestCameraPermission();
+                  } else {
+                    setState(() {
+                      _cameraPermission = false;
+                      _flashlightPermission = false; // Disable flashlight if camera is disabled
+                    });
+                  }
                 },
                 activeColor: TColor.primaryColor1,
                 checkColor: TColor.white,
@@ -571,10 +627,14 @@ class _OnboardingViewState extends State<OnboardingView> {
                   style: TextStyle(color: TColor.subTextColor),
                 ),
                 value: _flashlightPermission,
-                onChanged: (value) {
-                  setState(() {
-                    _flashlightPermission = value ?? false;
-                  });
+                onChanged: (value) async {
+                  if (value == true) {
+                    await _requestFlashlightPermission();
+                  } else {
+                    setState(() {
+                      _flashlightPermission = false;
+                    });
+                  }
                 },
                 activeColor: TColor.primaryColor1,
                 checkColor: TColor.white,

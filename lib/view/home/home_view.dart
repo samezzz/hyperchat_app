@@ -103,7 +103,7 @@ class _HomeViewState extends State<HomeView>
       decoration: BoxDecoration(
         color: backgroundColor ?? (isDarkMode ? TColor.darkSurface : TColor.secondaryColor2.withOpacity(0.1)),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: isDarkMode ? null : [
+        boxShadow: [
           BoxShadow(
             color: TColor.subTextColor.withOpacity(0.1),
             blurRadius: 10,
@@ -125,8 +125,8 @@ class _HomeViewState extends State<HomeView>
             'Quick Actions',
             style: TextStyle(
               color: TColor.textColor,
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ),
@@ -471,8 +471,8 @@ class _HomeViewState extends State<HomeView>
                       'Learn & Improve',
                       style: TextStyle(
                         color: TColor.textColor,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                     const SizedBox(height: 15),
@@ -535,8 +535,8 @@ class _HomeViewState extends State<HomeView>
                       'Learning Paths',
                       style: TextStyle(
                         color: TColor.textColor,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                     const SizedBox(height: 15),
