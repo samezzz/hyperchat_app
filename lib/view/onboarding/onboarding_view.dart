@@ -174,10 +174,10 @@ class _OnboardingViewState extends State<OnboardingView> {
     return Padding(
       padding: const EdgeInsets.only(top: 16, bottom: 8),
       child: Text(
-        title,
-        style: TextStyle(
+                  title,
+                  style: TextStyle(
           color: TColor.textColor,
-          fontSize: 16,
+                    fontSize: 16,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -207,14 +207,14 @@ class _OnboardingViewState extends State<OnboardingView> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
                 'Please answer these questions to help us provide better care.',
-                style: TextStyle(
+            style: TextStyle(
                   color: TColor.subTextColor,
-                  fontSize: 16,
+              fontSize: 16,
                 ),
               ),
               const SizedBox(height: 24),
@@ -264,9 +264,9 @@ class _OnboardingViewState extends State<OnboardingView> {
                       },
                       activeColor: TColor.primaryColor1,
                     ),
-                  ),
-                ],
-              ),
+          ),
+        ],
+      ),
 
               // Diagnosis Date (if Yes)
               if (_hypertensionStatus == 'Yes') ...[
@@ -275,20 +275,20 @@ class _OnboardingViewState extends State<OnboardingView> {
                   onTap: () => _selectDate(context),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                    decoration: BoxDecoration(
-                      border: Border.all(
+      decoration: BoxDecoration(
+        border: Border.all(
                         color: TColor.subTextColor.withAlpha(77),
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
+        children: [
+          Text(
                           _diagnosisDate == null
                               ? "Select date"
                               : "${_diagnosisDate!.day}/${_diagnosisDate!.month}/${_diagnosisDate!.year}",
-                          style: TextStyle(
+            style: TextStyle(
                             color: _diagnosisDate == null
                                 ? TColor.subTextColor.withAlpha(128)
                                 : TColor.textColor,
@@ -310,27 +310,27 @@ class _OnboardingViewState extends State<OnboardingView> {
               TextFormField(
                 controller: _medicationsController,
                 style: TextStyle(color: TColor.textColor),
-                decoration: InputDecoration(
+            decoration: InputDecoration(
                   hintText: "List your medications",
                   hintStyle: TextStyle(color: TColor.subTextColor.withAlpha(128)),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
+              contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
                       color: TColor.subTextColor.withAlpha(77),
-                    ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
                       color: TColor.subTextColor.withAlpha(77),
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
                       color: TColor.primaryColor1,
-                      width: 2,
+                  width: 2,
                     ),
                   ),
                 ),
@@ -364,10 +364,10 @@ class _OnboardingViewState extends State<OnboardingView> {
                         });
                       },
                       activeColor: TColor.primaryColor1,
-                    ),
-                  ),
-                ],
-              ),
+            ),
+          ),
+        ],
+      ),
 
               // Other Conditions
               _buildQuestionTitle('Do you have any of these conditions?'),
@@ -555,10 +555,10 @@ class _OnboardingViewState extends State<OnboardingView> {
                       value: false,
                       groupValue: _hasBPCuff,
                       onChanged: (value) {
-                        setState(() {
+                              setState(() {
                           _hasBPCuff = value;
-                        });
-                      },
+                              });
+                            },
                       activeColor: TColor.primaryColor1,
                     ),
                   ),
@@ -574,7 +574,7 @@ class _OnboardingViewState extends State<OnboardingView> {
                       title: Text('Left', style: TextStyle(color: TColor.textColor)),
                       value: 'Left',
                       groupValue: _preferredHand,
-                      onChanged: (value) {
+                            onChanged: (value) {
                         setState(() {
                           _preferredHand = value;
                         });
@@ -587,7 +587,7 @@ class _OnboardingViewState extends State<OnboardingView> {
                       title: Text('Right', style: TextStyle(color: TColor.textColor)),
                       value: 'Right',
                       groupValue: _preferredHand,
-                      onChanged: (value) {
+                            onChanged: (value) {
                         setState(() {
                           _preferredHand = value;
                         });
@@ -638,15 +638,15 @@ class _OnboardingViewState extends State<OnboardingView> {
                 },
                 activeColor: TColor.primaryColor1,
                 checkColor: TColor.white,
-              ),
+                          ),
 
-              const SizedBox(height: 32),
+                          const SizedBox(height: 32),
 
               // Submit Button
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: ElevatedButton(
                   onPressed: () {
                     if (_hypertensionStatus == null || _activityLevel == null) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -667,25 +667,25 @@ class _OnboardingViewState extends State<OnboardingView> {
                         builder: (context) => const MainTabView(),
                       ),
                     );
-                  },
-                  style: ElevatedButton.styleFrom(
+                              },
+                              style: ElevatedButton.styleFrom(
                     backgroundColor: TColor.primaryColor1,
                     foregroundColor: TColor.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                     elevation: 0,
                   ),
                   child: const Text(
                     'Complete Questionnaire',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
           ),
         ),
       ),

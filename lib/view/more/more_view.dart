@@ -28,89 +28,89 @@ class MoreView extends StatelessWidget {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             _buildSection(
               'Settings',
-              [
-                _buildSettingItem(
-                  context,
+                [
+                  _buildSettingItem(
+                    context,
                   icon: Icons.notifications_outlined,
                   title: 'Notifications',
                   subtitle: 'Manage notification preferences',
-                  onTap: () {
+                    onTap: () {
                     // TODO: Navigate to notifications settings
-                  },
-                ),
-                _buildSettingItem(
-                  context,
+                    },
+                  ),
+                  _buildSettingItem(
+                    context,
                   icon: Icons.language_outlined,
                   title: 'Language',
                   subtitle: 'English',
                   onTap: () {
                     // TODO: Navigate to language settings
                   },
-                ),
-                _buildSettingItem(
-                  context,
+                  ),
+                  _buildSettingItem(
+                    context,
                   icon: Icons.help_outline,
                   title: 'Help & Support',
                   subtitle: 'FAQs, contact support',
                   onTap: () {
                     // TODO: Navigate to help & support
                   },
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
             const SizedBox(height: 24),
             _buildSection(
               'Health Tools',
-              [
-                _buildSettingItem(
-                  context,
+                [
+                  _buildSettingItem(
+                    context,
                   icon: Icons.calendar_today_outlined,
                   title: 'Reminders',
                   subtitle: 'Set up medication and measurement reminders',
                   onTap: () {
                     // TODO: Navigate to reminders
                   },
-                ),
-                _buildSettingItem(
-                  context,
+                  ),
+                  _buildSettingItem(
+                    context,
                   icon: Icons.analytics_outlined,
                   title: 'Health Reports',
                   subtitle: 'Generate and share health reports',
                   onTap: () {
                     // TODO: Navigate to health reports
                   },
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
             const SizedBox(height: 24),
             _buildSection(
               'Account',
-              [
-                _buildSettingItem(
-                  context,
+                [
+                  _buildSettingItem(
+                    context,
                   icon: Icons.person_outline,
                   title: 'Profile',
                   subtitle: 'Manage your profile information',
                   onTap: () {
                     // TODO: Navigate to profile
                   },
-                ),
-                _buildSettingItem(
-                  context,
+                  ),
+                  _buildSettingItem(
+                    context,
                   icon: Icons.security_outlined,
                   title: 'Privacy & Security',
                   subtitle: 'Manage your privacy settings',
                   onTap: () {
                     // TODO: Navigate to privacy settings
                   },
-                ),
-                _buildSettingItem(
-                  context,
+                  ),
+                  _buildSettingItem(
+                    context,
                   icon: Icons.logout_outlined,
                   title: 'Sign Out',
                   subtitle: 'Sign out of your account',
@@ -118,43 +118,43 @@ class MoreView extends StatelessWidget {
                     // TODO: Implement sign out
                   },
                   isDestructive: true,
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
             const SizedBox(height: 24),
             _buildSection(
               'About',
-              [
-                _buildSettingItem(
-                  context,
+                [
+                  _buildSettingItem(
+                    context,
                   icon: Icons.info_outline,
                   title: 'About HyperChat',
                   subtitle: 'Version 1.0.0',
                   onTap: () {
                     // TODO: Show about dialog
                   },
-                ),
-                _buildSettingItem(
-                  context,
+                  ),
+                  _buildSettingItem(
+                    context,
                   icon: Icons.description_outlined,
                   title: 'Terms of Service',
                   subtitle: 'Read our terms of service',
                   onTap: () {
                     // TODO: Show terms of service
                   },
-                ),
-                _buildSettingItem(
-                  context,
+                  ),
+                  _buildSettingItem(
+                    context,
                   icon: Icons.privacy_tip_outlined,
                   title: 'Privacy Policy',
                   subtitle: 'Read our privacy policy',
                   onTap: () {
                     // TODO: Show privacy policy
                   },
-                ),
-              ],
-            ),
-          ],
+                  ),
+                ],
+              ),
+            ],
         ),
       ),
     );
@@ -166,14 +166,14 @@ class MoreView extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 16, bottom: 8),
-          child: Text(
-            title,
-            style: TextStyle(
+      child: Text(
+        title,
+        style: TextStyle(
               color: TColor.subTextColor,
               fontSize: 14,
               fontWeight: FontWeight.w600,
-            ),
-          ),
+        ),
+      ),
         ),
         ...items,
       ],
@@ -204,27 +204,27 @@ class MoreView extends StatelessWidget {
         ],
       ),
       child: ListTile(
-        onTap: onTap,
+      onTap: onTap,
         leading: Icon(
           icon,
           color: isDestructive ? TColor.error : TColor.primaryColor1,
         ),
         title: Text(
-          title,
-          style: TextStyle(
+                    title,
+                    style: TextStyle(
             color: isDestructive ? TColor.error : TColor.textColor,
             fontWeight: FontWeight.w500,
-          ),
-        ),
+                    ),
+                  ),
         subtitle: Text(
-          subtitle,
-          style: TextStyle(
+                    subtitle,
+                    style: TextStyle(
             color: TColor.subTextColor,
             fontSize: 12,
-          ),
-        ),
+                    ),
+                  ),
         trailing: Icon(
-          Icons.chevron_right,
+              Icons.chevron_right,
           color: TColor.subTextColor,
         ),
       ),

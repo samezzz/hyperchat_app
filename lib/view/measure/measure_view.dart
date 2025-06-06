@@ -1,7 +1,25 @@
+import 'dart:async';
+import 'dart:isolate';
+import 'dart:developer';
+import 'dart:typed_data';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../common/colo_extension.dart';
+import 'package:wakelock_plus/wakelock_plus.dart'; // Corrected import
+import 'package:collection/collection.dart';
+import 'measure_result_view.dart'; // Import the new results view
+
+// Data structure for a PPG signal point
+class PpgDataPoint {
+  final int timestamp; // milliseconds since epoch
+  final double value; // Aggregated pixel value
+
+  PpgDataPoint(this.timestamp, this.value);
+}
+
 
 class MeasureView extends StatefulWidget {
   const MeasureView({super.key});
@@ -19,6 +37,18 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
   bool _isCameraInitialized = false;
   bool _isFlashlightOn = false;
   bool _showResults = false;
+  int _estimatedBPM = 0; // To store the calculated heart rate
+
+  // Isolate related variables
+  Isolate? _processingIsolate;
+  ReceivePort? _receivePort;
+  SendPort? _sendPort;
+
+  // Timer for measurement duration and progress
+  Timer? _measurementTimer;
+  static const int _measurementDuration = 15; // Measurement duration in seconds
+  int _elapsedSeconds = 0;
+
 
   @override
   void initState() {
@@ -27,7 +57,7 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
       duration: const Duration(seconds: 1),
       vsync: this,
     )..repeat(reverse: true);
-    
+
     _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
@@ -66,8 +96,9 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
 
     _cameraController = CameraController(
       rearCamera,
-      ResolutionPreset.high,
+      ResolutionPreset.low, // Using low resolution for faster processing
       enableAudio: false,
+      imageFormatGroup: ImageFormatGroup.yuv420, // Use YUV for easier access to color channels
     );
 
     try {
@@ -86,18 +117,17 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
     }
   }
 
-  Future<void> _toggleFlashlight() async {
-    if (_cameraController == null || !_isCameraInitialized) return;
+  Future<void> _toggleFlashlight(bool value) async {
+     if (_cameraController == null || !_isCameraInitialized) return;
 
     try {
-      if (_isFlashlightOn) {
-        await _cameraController!.setFlashMode(FlashMode.off);
-      } else {
+      if (value) {
         await _cameraController!.setFlashMode(FlashMode.torch);
+        setState(() => _isFlashlightOn = true);
+      } else {
+        await _cameraController!.setFlashMode(FlashMode.off);
+         setState(() => _isFlashlightOn = false);
       }
-      setState(() {
-        _isFlashlightOn = !_isFlashlightOn;
-      });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -107,53 +137,273 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
     }
   }
 
-  void _startMeasurement() {
+
+  void _startMeasurement() async {
     if (!_isCameraInitialized || !_isFlashlightOn) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please ensure camera is ready and flashlight is on')),
-      );
+      if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+           const SnackBar(content: Text('Please ensure camera is ready and flashlight is on')),
+         );
+      }
       return;
     }
 
-    setState(() {
-      isMeasuring = true;
-      measurementProgress = 0.0;
-    });
-
-    // Simulate measurement progress
-    Future.delayed(const Duration(milliseconds: 100), () {
-      _updateProgress();
-    });
-  }
-
-  void _updateProgress() {
-    if (measurementProgress < 1.0) {
-      setState(() {
-        measurementProgress += 0.1;
-      });
-      Future.delayed(const Duration(milliseconds: 500), () {
-        _updateProgress();
-      });
-    } else {
-      setState(() {
-        isMeasuring = false;
-        _showResults = true;
-      });
+    if (mounted) {
+       setState(() {
+         isMeasuring = true;
+         _showResults = false;
+         measurementProgress = 0.0;
+         _estimatedBPM = 0;
+         _elapsedSeconds = 0;
+       });
     }
+
+
+    WakelockPlus.enable(); // Keep screen on during measurement
+
+    // Start the isolate first to get the sendPort
+    await _startProcessingIsolate();
+
+    // Start the image stream and send images to the isolate
+     _startImageStream();
+
+    // Start the measurement timer for progress and completion
+     _startMeasurementTimer();
   }
+
+  void _startImageStream() {
+     _cameraController!.startImageStream((CameraImage image) {
+      // Send image to the isolate for processing
+       _sendPort?.send(image);
+     });
+  }
+
+  Future<void> _startProcessingIsolate() async {
+     _receivePort = ReceivePort();
+     _processingIsolate = await Isolate.spawn(
+       _imageProcessingEntry,
+       _receivePort!.sendPort,
+     );
+
+    _receivePort!.listen((message) {
+       if (message is SendPort) {
+         _sendPort = message; // Get the send port from the isolate
+       } else if (message is int) {
+         // Received calculated BPM from isolate
+         if (mounted) {
+            setState(() {
+              _estimatedBPM = message;
+            });
+         }
+       } else if (message is String && message == 'measurement_complete') {
+          // Isolate signals measurement is complete (optional, using timer for now)
+           // _stopMeasurement(); // We'll use the timer for now for consistent duration
+       }
+     });
+  }
+
+  void _startMeasurementTimer() {
+     _measurementTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (mounted) {
+           setState(() {
+              _elapsedSeconds = timer.tick;
+              measurementProgress = _elapsedSeconds / _measurementDuration;
+
+              if (_elapsedSeconds >= _measurementDuration) {
+                 _measurementTimer?.cancel();
+                 _stopMeasurement();
+              }
+           });
+        }
+     });
+  }
+
+
+  void _stopMeasurement() {
+     _cameraController?.stopImageStream();
+     _processingIsolate?.kill();
+     _receivePort?.close();
+     _measurementTimer?.cancel(); // Ensure timer is cancelled
+     WakelockPlus.disable(); // Allow screen to turn off
+
+     if (mounted) {
+       setState(() {
+         isMeasuring = false;
+         _showResults = true; // Set to true to show results view
+       });
+     }
+  }
+
+  // This function runs in a separate isolate
+  static void _imageProcessingEntry(SendPort sendPort) {
+    ReceivePort receivePort = ReceivePort();
+    sendPort.send(receivePort.sendPort); // Send the receive port back to the main isolate
+
+    // --- PPG Processing Variables ---
+    List<PpgDataPoint> ppgData = [];
+    final int windowSize = 60 * 5; // Process data over 5 seconds (assuming 60 fps)
+    final int bufferSize = 60 * 15; // Keep 15 seconds of data in buffer
+
+    // --- Signal Processing and Peak Detection Variables ---
+    // Simple moving average filter
+    final int filterWindowSize = 5;
+    List<double> rawSignalBuffer = [];
+    List<double> filteredSignal = [];
+
+    // Peak detection parameters (will need tuning)
+    final double peakProminence = 5.0; // Minimum peak prominence
+    final double minPeakDistance = 0.5; // Minimum distance between peaks in seconds
+
+    // --- Heart Rate Calculation Variables ---
+    List<int> peakTimestamps = []; // Timestamps of detected peaks
+
+
+    receivePort.listen((message) {
+       if (message is CameraImage) {
+         int timestamp = DateTime.now().millisecondsSinceEpoch;
+
+         // 1. Extract Green Channel Intensity
+         // Assuming YUV420_888 format based on camera controller setup
+         // The Y plane is luminance, U and V are chrominance.
+         // Green channel intensity can be approximated from Y plane,
+         // or more accurately, process all planes and convert to RGB
+         // or use a native plugin for direct RGB access.
+         // For simplicity here, we'll use the average luminance from the Y plane
+         // as a proxy for PPG signal, similar to lib2/lib8, but this is a limitation
+         // of purely Dart-based access to specific color channels in YUV.
+         // A more robust implementation would process RGB data.
+         double avgIntensity = 0;
+         if (message.planes.isNotEmpty) {
+            // A more accurate method for green channel in YUV:
+            // Iterate over Y plane and use approximate conversion
+            // Or, if available, use a library that provides easier access.
+            // For now, sticking to the simple average of Y plane for demonstration
+             avgIntensity = message.planes[0].bytes.reduce((value, element) => value + element) / message.planes[0].bytes.length;
+         } else {
+            // Handle case where planes are empty
+             return;
+         }
+
+
+         // Store the raw data point
+         rawSignalBuffer.add(avgIntensity);
+         if (rawSignalBuffer.length > bufferSize) {
+             rawSignalBuffer.removeAt(0);
+         }
+         ppgData.add(PpgDataPoint(timestamp, avgIntensity));
+         if (ppgData.length > bufferSize) {
+             ppgData.removeAt(0);
+          }
+
+
+         // 2. Apply Simple Moving Average Filter
+         if (rawSignalBuffer.length >= filterWindowSize) {
+            double movingAverage = rawSignalBuffer.sublist(rawSignalBuffer.length - filterWindowSize).reduce((a, b) => a + b) / filterWindowSize;
+            filteredSignal.add(movingAverage);
+             if (filteredSignal.length > bufferSize) {
+                filteredSignal.removeAt(0);
+             }
+
+
+            // 3. Peak Detection (Simple approach based on local maxima and distance)
+            if (filteredSignal.length > 1) {
+                // A basic peak detection looks for a point higher than its immediate neighbors.
+                // For better robustness, we check against a few previous points after filtering.
+                if (filteredSignal.length > 2) {
+                   int lastIndex = filteredSignal.length - 1;
+                   double currentValue = filteredSignal[lastIndex];
+                   double previousValue = filteredSignal[lastIndex - 1];
+                   double previousValue2 = filteredSignal[lastIndex - 2];
+
+
+                    // Check if current value is a local maximum compared to recent points
+                    if (currentValue > previousValue && previousValue >= previousValue2) {
+                       // Consider this a potential peak.
+                       // Add filtering for realistic peaks (e.g., minimum distance and prominence)
+                       int currentPeakTimestamp = ppgData.last.timestamp; // Use timestamp of the latest data point
+
+                       bool isTooCloseToLastPeak = false;
+                       if (peakTimestamps.isNotEmpty) {
+                           int timeDiff = currentPeakTimestamp - peakTimestamps.last;
+                           if (timeDiff < minPeakDistance * 1000) { // minPeakDistance in milliseconds
+                               isTooCloseToLastPeak = true;
+                           }
+                       }
+
+                       // Simple check for prominence could involve comparing the peak value
+                       // to the surrounding minima. This basic check is omitted for simplicity
+                       // but is important for a robust implementation.
+                       bool meetsProminence = true; // Placeholder - needs a real check
+
+
+                       if (!isTooCloseToLastPeak && meetsProminence) {
+                           peakTimestamps.add(currentPeakTimestamp);
+                            // Keep peakTimestamps buffer size in check (e.g., last 30 seconds of peaks)
+                            // A window based on time or a fixed number of peaks related to expected heart rate range is better.
+                             if (peakTimestamps.length > 50) { // Example: Keep last ~50 peaks
+                               peakTimestamps.removeAt(0);
+                            }
+
+
+                            // 4. Calculate Heart Rate from NN Intervals (if enough peaks)
+                            // Need at least two peaks to calculate an interval. More peaks for a stable average.
+                            if (peakTimestamps.length > 5) { // Require a minimum number of peaks for calculation
+                                List<int> nnIntervals = [];
+                                for (int i = 1; i < peakTimestamps.length; i++) {
+                                   nnIntervals.add(peakTimestamps[i] - peakTimestamps[i-1]);
+                                }
+
+                                // Basic outlier removal for NN intervals (optional but good practice)
+                                // Can implement something like removing intervals significantly different from the median.
+                                // For simplicity, skipping outlier removal in this basic implementation.
+
+                                // Calculate average NN interval
+                                double averageNN = nnIntervals.reduce((a, b) => a + b) / nnIntervals.length;
+
+                                // Calculate BPM: 60 seconds / average NN interval in seconds
+                                if (averageNN > 0) {
+                                    int calculatedBPM = (60000 / averageNN).round();
+
+                                     // Simple validation for plausible BPM range
+                                     if (calculatedBPM > 30 && calculatedBPM < 180) {
+                                        // Send BPM back to main isolate
+                                        sendPort.send(calculatedBPM);
+                                     }
+                                }
+                            }
+                       }
+                    }
+                }
+             }
+         }
+       }
+    });
+  }
+
 
   void _resetMeasurement() {
-    setState(() {
-      _showResults = false;
-      isMeasuring = false;
-      measurementProgress = 0.0;
-    });
+    _stopMeasurement(); // Ensure everything is stopped
+    if (mounted) {
+       setState(() {
+         _showResults = false;
+         isMeasuring = false;
+         measurementProgress = 0.0;
+         _estimatedBPM = 0;
+         _elapsedSeconds = 0;
+       });
+    }
+
+     _toggleFlashlight(false); // Turn off flashlight
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
     _cameraController?.dispose();
+    _processingIsolate?.kill(); // Ensure isolate is killed on dispose
+    _receivePort?.close();
+    _measurementTimer?.cancel(); // Ensure timer is cancelled
+    WakelockPlus.disable();
     super.dispose();
   }
 
@@ -161,49 +411,44 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     TColor.toggleDarkMode(isDarkMode);
-    
+
     return Scaffold(
       backgroundColor: TColor.bgColor,
       body: SafeArea(
-        child: _showResults 
-          ? _buildResultView() 
-          : (isMeasuring ? _buildMeasuringView() : _buildSetupView()),
+        child: _showResults
+          ? MeasureResultView(
+              estimatedBPM: _estimatedBPM, // Pass the estimated BPM
+              onSave: _resetMeasurement, // Pass the reset function as the save callback
+            )
+          : (_isCameraInitialized ? (isMeasuring ? _buildMeasuringView() : _buildSetupView()) : const Center(child: CircularProgressIndicator())),
       ),
     );
   }
 
   Widget _buildSetupView() {
-    if (!_isCameraInitialized) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
-    }
-
+    // This view remains largely the same, just ensuring flashlight toggle works
     return Stack(
       children: [
         // Camera preview
-        SizedBox(
-          width: double.infinity,
-          height: double.infinity,
-          child: CameraPreview(_cameraController!),
-        ),
+        if (_cameraController != null && _cameraController!.value.isInitialized)
+           Positioned.fill( // Use Positioned.fill to cover the whole area
+            child: AspectRatio(
+               aspectRatio: _cameraController!.value.aspectRatio,
+               child: CameraPreview(_cameraController!),
+            ),
+          ),
         // Overlay
         Container(
           width: double.infinity,
           height: double.infinity,
-          color: Colors.black.withOpacity(0.3),
+          color: Colors.black.withOpacity(0.5), // Darken overlay for better contrast
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Flashlight status
-              Icon(
-                _isFlashlightOn ? Icons.flash_on : Icons.flash_off,
-                color: _isFlashlightOn ? TColor.primaryColor1 : TColor.white,
-                size: 48,
-              ),
-              const SizedBox(height: 20),
+              // Instruction text
               Text(
-                _isFlashlightOn ? 'Flashlight is ON' : 'Flashlight is OFF',
+                _isFlashlightOn ? 'Cover the camera and flash with your finger' : 'Turn on the flashlight to start measurement',
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   color: TColor.white,
                   fontSize: 18,
@@ -211,9 +456,19 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
                 ),
               ),
               const SizedBox(height: 40),
+               // Flashlight toggle button
+              FloatingActionButton(
+                 onPressed: () => _toggleFlashlight(!_isFlashlightOn),
+                 backgroundColor: _isFlashlightOn ? TColor.primaryColor1 : TColor.subTextColor,
+                 child: Icon(
+                   _isFlashlightOn ? Icons.flash_on : Icons.flash_off,
+                   color: TColor.white,
+                 ),
+               ),
+              const SizedBox(height: 40),
               // Start measurement button
               ElevatedButton(
-                onPressed: _isFlashlightOn ? _startMeasurement : _toggleFlashlight,
+                onPressed: _isFlashlightOn ? _startMeasurement : null, // Enable only when flashlight is on
                 style: ElevatedButton.styleFrom(
                   backgroundColor: TColor.primaryColor1,
                   foregroundColor: TColor.white,
@@ -222,9 +477,9 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
                     borderRadius: BorderRadius.circular(30),
                   ),
                 ),
-                child: Text(
-                  _isFlashlightOn ? 'Start Measurement' : 'Turn On Flashlight',
-                  style: const TextStyle(
+                child: const Text(
+                  'Start Measurement',
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                   ),
@@ -237,235 +492,76 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildMeasuringView() {
+
+ Widget _buildMeasuringView() {
+    // This view will show the animation and progress
     return Container(
       width: double.infinity,
       height: double.infinity,
-      color: TColor.bgColor,
+      color: TColor.bgColor, // Or a different background if needed
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Waveform visualization
+          // Pulsating Heart Animation
           AnimatedBuilder(
             animation: _pulseAnimation,
             builder: (context, child) {
               return Transform.scale(
                 scale: _pulseAnimation.value,
-                child: Container(
-                  width: 200,
-                  height: 200,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: TColor.primaryColor1.withAlpha(128),
-                      width: 2,
-                    ),
-                  ),
-                  child: Center(
-                    child: Container(
-                      width: 180,
-                      height: 180,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: TColor.primaryColor1.withAlpha(77),
-                      ),
-                      child: Center(
-                        child: Icon(
-                          Icons.favorite,
-                          color: TColor.primaryColor1,
-                          size: 60,
-                        ),
-                      ),
-                    ),
-                  ),
+                child: Icon(
+                  Icons.favorite,
+                  color: TColor.primaryColor1,
+                  size: 120, // Increased size for prominence
                 ),
               );
             },
           ),
           const SizedBox(height: 40),
-          // Progress text
+          // Estimated BPM display
           Text(
-            "Measuring... ${(measurementProgress * 100).toInt()}%",
+            _estimatedBPM > 0 ? '${_estimatedBPM} BPM' : 'Measuring...',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: TColor.textColor,
-              fontSize: 24,
+              fontSize: 32, // Increased size
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 10),
+          // Progress text or instruction
           Text(
-            "Hold steady",
+             _elapsedSeconds >= _measurementDuration - 3 ?
+             'Finishing measurement...' : // Message when nearing completion
+             'Hold your finger steady on the camera lens with flash on.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: TColor.subTextColor,
               fontSize: 16,
             ),
           ),
+           const SizedBox(height: 40),
+          // Linear progress indicator
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32.0),
+            child: LinearProgressIndicator(
+              value: measurementProgress, // Use the state variable for progress
+              backgroundColor: TColor.subTextColor.withOpacity(0.3),
+              valueColor: AlwaysStoppedAnimation<Color>(TColor.primaryColor1),
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+           const SizedBox(height: 10),
+           // Timer display
+           Text(
+            '${_elapsedSeconds} / ${_measurementDuration} seconds',
+            style: TextStyle(
+              color: TColor.subTextColor,
+              fontSize: 14,
+            ),
+          ),
         ],
       ),
     );
   }
-
-  Widget _buildResultView() {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      color: TColor.bgColor,
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(height: MediaQuery.of(context).size.height * 0.1),
-              // BP Values
-              Center(
-                child: Column(
-                  children: [
-                    Text(
-                      "132 / 88",
-                      style: TextStyle(
-                        color: TColor.textColor,
-                        fontSize: 48,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      "mmHg",
-                      style: TextStyle(
-                        color: TColor.subTextColor,
-                        fontSize: 18,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 30),
-              
-              // Heart Rate
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.favorite,
-                    color: TColor.primaryColor1,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    "78 bpm",
-                    style: TextStyle(
-                      color: TColor.textColor,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 30),
-
-              // Feedback
-              Container(
-                padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(
-                  color: TColor.primaryColor1.withAlpha(26),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      color: TColor.primaryColor1,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        "Elevated – Consider deep breathing exercises",
-                        style: TextStyle(
-                          color: TColor.primaryColor1,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Context Dropdown
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 15),
-                decoration: BoxDecoration(
-                  color: isDarkMode ? TColor.darkSurface : TColor.white,
-                  border: Border.all(
-                    color: TColor.subTextColor.withAlpha(77),
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    isExpanded: true,
-                    value: "After exercise",
-                    items: [
-                      "After exercise",
-                      "At rest",
-                      "After medication",
-                      "Before sleep",
-                    ].map((String value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(
-                          value,
-                          style: TextStyle(
-                            color: TColor.textColor,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      // TODO: Handle context change
-                    },
-                    style: TextStyle(
-                      color: TColor.textColor,
-                    ),
-                    icon: Icon(
-                      Icons.arrow_drop_down,
-                      color: TColor.textColor,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 30),
-
-              // Save Button
-              ElevatedButton(
-                onPressed: () {
-                  // TODO: Handle save
-                  _resetMeasurement();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: TColor.primaryColor1,
-                  foregroundColor: TColor.white,
-                  minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: const Text(
-                  "Save Measurement",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-} 
+}
