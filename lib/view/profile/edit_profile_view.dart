@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:camera/camera.dart';
+import '../../common/colo_extension.dart';
 import '../../models/user_model.dart';
 import '../../providers/user_provider.dart';
-import '../../common/colo_extension.dart';
 
 class EditProfileView extends StatefulWidget {
   final UserModel user;
@@ -64,6 +66,7 @@ class _EditProfileViewState extends State<EditProfileView> {
   void initState() {
     super.initState();
     _initializeControllers();
+    _checkFlashlightPermission();
   }
 
   void _initializeControllers() {
@@ -172,6 +175,45 @@ class _EditProfileViewState extends State<EditProfileView> {
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _checkFlashlightPermission() async {
+    // Check if the device has a camera with flash
+    final cameras = await availableCameras();
+    final hasCameraWithFlash = cameras.any((camera) => 
+      camera.lensDirection == CameraLensDirection.back && 
+      camera.sensorOrientation != null
+    );
+
+    if (!hasCameraWithFlash) {
+      setState(() {
+        _flashlightPermission = false;
+      });
+      return;
+    }
+
+    // Check camera permission (required for flashlight)
+    final cameraStatus = await Permission.camera.status;
+    setState(() {
+      _flashlightPermission = cameraStatus.isGranted;
+    });
+  }
+
+  Future<void> _requestFlashlightPermission() async {
+    final cameraStatus = await Permission.camera.request();
+    setState(() {
+      _flashlightPermission = cameraStatus.isGranted;
+    });
+
+    if (!cameraStatus.isGranted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Camera permission is required for flashlight access'),
+          ),
+        );
       }
     }
   }
@@ -523,7 +565,13 @@ class _EditProfileViewState extends State<EditProfileView> {
         style: TextStyle(color: TColor.subTextColor, fontSize: 14),
       ),
       value: value,
-      onChanged: onChanged,
+      onChanged: (newValue) {
+        if (title == 'Flashlight Permission') {
+          _requestFlashlightPermission();
+        } else {
+          onChanged(newValue);
+        }
+      },
       activeColor: TColor.primaryColor1,
       contentPadding: EdgeInsets.zero,
     );

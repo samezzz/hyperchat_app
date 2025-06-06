@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../common/colo_extension.dart';
 
 class MeasureView extends StatefulWidget {
@@ -9,10 +11,14 @@ class MeasureView extends StatefulWidget {
 }
 
 class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStateMixin {
-  bool isMeasuring = true;
+  bool isMeasuring = false;
   double measurementProgress = 0.0;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  CameraController? _cameraController;
+  bool _isCameraInitialized = false;
+  bool _isFlashlightOn = false;
+  bool _showResults = false;
 
   @override
   void initState() {
@@ -25,6 +31,94 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
     _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+
+    _initializeCamera();
+  }
+
+  Future<void> _initializeCamera() async {
+    // Request camera permission
+    final cameraStatus = await Permission.camera.request();
+    if (cameraStatus.isDenied) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Camera permission is required for measurement')),
+        );
+      }
+      return;
+    }
+
+    // Get available cameras
+    final cameras = await availableCameras();
+    if (cameras.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No cameras available')),
+        );
+      }
+      return;
+    }
+
+    // Initialize camera controller with rear camera
+    final rearCamera = cameras.firstWhere(
+      (camera) => camera.lensDirection == CameraLensDirection.back,
+      orElse: () => cameras.first,
+    );
+
+    _cameraController = CameraController(
+      rearCamera,
+      ResolutionPreset.high,
+      enableAudio: false,
+    );
+
+    try {
+      await _cameraController!.initialize();
+      if (mounted) {
+        setState(() {
+          _isCameraInitialized = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to initialize camera: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleFlashlight() async {
+    if (_cameraController == null || !_isCameraInitialized) return;
+
+    try {
+      if (_isFlashlightOn) {
+        await _cameraController!.setFlashMode(FlashMode.off);
+      } else {
+        await _cameraController!.setFlashMode(FlashMode.torch);
+      }
+      setState(() {
+        _isFlashlightOn = !_isFlashlightOn;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to toggle flashlight: $e')),
+        );
+      }
+    }
+  }
+
+  void _startMeasurement() {
+    if (!_isCameraInitialized || !_isFlashlightOn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please ensure camera is ready and flashlight is on')),
+      );
+      return;
+    }
+
+    setState(() {
+      isMeasuring = true;
+      measurementProgress = 0.0;
+    });
 
     // Simulate measurement progress
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -43,13 +137,23 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
     } else {
       setState(() {
         isMeasuring = false;
+        _showResults = true;
       });
     }
+  }
+
+  void _resetMeasurement() {
+    setState(() {
+      _showResults = false;
+      isMeasuring = false;
+      measurementProgress = 0.0;
+    });
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
+    _cameraController?.dispose();
     super.dispose();
   }
 
@@ -61,8 +165,75 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
     return Scaffold(
       backgroundColor: TColor.bgColor,
       body: SafeArea(
-        child: isMeasuring ? _buildMeasuringView() : _buildResultView(),
+        child: _showResults 
+          ? _buildResultView() 
+          : (isMeasuring ? _buildMeasuringView() : _buildSetupView()),
       ),
+    );
+  }
+
+  Widget _buildSetupView() {
+    if (!_isCameraInitialized) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    return Stack(
+      children: [
+        // Camera preview
+        SizedBox(
+          width: double.infinity,
+          height: double.infinity,
+          child: CameraPreview(_cameraController!),
+        ),
+        // Overlay
+        Container(
+          width: double.infinity,
+          height: double.infinity,
+          color: Colors.black.withOpacity(0.3),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Flashlight status
+              Icon(
+                _isFlashlightOn ? Icons.flash_on : Icons.flash_off,
+                color: _isFlashlightOn ? TColor.primaryColor1 : TColor.white,
+                size: 48,
+              ),
+              const SizedBox(height: 20),
+              Text(
+                _isFlashlightOn ? 'Flashlight is ON' : 'Flashlight is OFF',
+                style: TextStyle(
+                  color: TColor.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 40),
+              // Start measurement button
+              ElevatedButton(
+                onPressed: _isFlashlightOn ? _startMeasurement : _toggleFlashlight,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: TColor.primaryColor1,
+                  foregroundColor: TColor.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+                child: Text(
+                  _isFlashlightOn ? 'Start Measurement' : 'Turn On Flashlight',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -273,6 +444,7 @@ class _MeasureViewState extends State<MeasureView> with SingleTickerProviderStat
               ElevatedButton(
                 onPressed: () {
                   // TODO: Handle save
+                  _resetMeasurement();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: TColor.primaryColor1,
