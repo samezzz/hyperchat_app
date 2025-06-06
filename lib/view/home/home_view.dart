@@ -569,7 +569,7 @@ class _HomeViewState extends State<HomeView>
                         child: Column(
                           children: [
                             Text(
-                              'Latest Reading',
+                              'Blood Pressure',
                               style: TextStyle(
                                 color: TColor.subTextColor,
                                 fontSize: 14,
@@ -577,16 +577,27 @@ class _HomeViewState extends State<HomeView>
                               ),
                             ),
                             const SizedBox(height: 8),
+                            _isLoadingMeasurement
+                                ? CircularProgressIndicator(color: TColor.primaryColor1)
+                                : _latestMeasurement == null
+                                    ? Text(
+                                        'No data',
+                                        style: TextStyle(
+                                          color: TColor.textColor,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      )
+                                    : Text(
+                                        '${_latestMeasurement!.systolicBP}/${_latestMeasurement!.diastolicBP}',
+                                        style: TextStyle(
+                                          color: TColor.textColor,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
                             Text(
-                              '120/80',
-                              style: TextStyle(
-                                color: TColor.textColor,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              'Normal',
+                              'mmHg',
                               style: TextStyle(
                                 color: TColor.primaryColor1,
                                 fontSize: 12,
@@ -610,14 +621,25 @@ class _HomeViewState extends State<HomeView>
                               ),
                             ),
                             const SizedBox(height: 8),
-                            Text(
-                              '72',
-                              style: TextStyle(
-                                color: TColor.textColor,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                            _isLoadingMeasurement
+                                ? CircularProgressIndicator(color: TColor.primaryColor1)
+                                : _latestMeasurement == null
+                                    ? Text(
+                                        'No data',
+                                        style: TextStyle(
+                                          color: TColor.textColor,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      )
+                                    : Text(
+                                        _latestMeasurement!.heartRate.toString(),
+                                        style: TextStyle(
+                                          color: TColor.textColor,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
                             Text(
                               'BPM',
                               style: TextStyle(
