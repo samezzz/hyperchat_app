@@ -4,7 +4,7 @@ import '../home/home_view.dart';
 import '../measure/measure_view.dart';
 import '../chat/chat_view.dart';
 import '../history/history_view.dart';
-import '../more/more_view.dart';
+import '../insights/insights_view.dart';
 import '../../common/colo_extension.dart';
 
 class MainTabView extends StatefulWidget {
@@ -117,12 +117,12 @@ class _MainTabViewState extends State<MainTabView> {
                     ),
                     const SizedBox(width: 20),
                     _buildNavItem(
-                      icon: selectTab == 4 ? Icons.menu : Icons.menu_outlined,
+                      icon: selectTab == 4 ? Icons.insights : Icons.insights_outlined,
                       isSelected: selectTab == 4,
                       onTap: () {
                         setState(() {
                           selectTab = 4;
-                          currentTab = const MoreView();
+                          currentTab = const InsightsView();
                         });
                       },
                     ),

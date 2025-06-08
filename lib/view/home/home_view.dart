@@ -183,62 +183,6 @@ class _HomeViewState extends State<HomeView>
     );
   }
 
-  List<Map<String, dynamic>> _getLearningModules(BuildContext context) {
-    return [
-      {
-        'icon': '🧂',
-        'title': 'Sodium Myths',
-        'description': 'Learn the truth about salt and blood pressure',
-        'color': TColor.primaryColor2.withOpacity(0.1),
-      },
-      {
-        'icon': '🧘',
-        'title': 'Breathing Exercises',
-        'description': 'Simple techniques to lower your BP naturally',
-        'color': TColor.secondaryColor1.withOpacity(0.1),
-      },
-      {
-        'icon': '📈',
-        'title': 'Understanding Your BP Numbers',
-        'description': 'What do your readings really mean?',
-        'color': TColor.primaryColor2.withOpacity(0.1),
-      },
-    ];
-  }
-
-  List<Map<String, dynamic>> _getLearningPaths(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    return [
-      {
-        'title': 'Hypertension Basics',
-        'progress': 15,
-        'total': 15,
-        'icon': '✅',
-        'color': isDarkMode
-            ? TColor.darkPrimary
-            : TColor.primaryColor1.withOpacity(0.1),
-      },
-      {
-        'title': 'Medication Management',
-        'progress': 4,
-        'total': 10,
-        'icon': '⏳',
-        'color': isDarkMode
-            ? TColor.darkSecondary
-            : TColor.secondaryColor1.withOpacity(0.1),
-      },
-      {
-        'title': 'Healthy Eating for BP',
-        'progress': 0,
-        'total': 20,
-        'icon': '📖',
-        'color': isDarkMode
-            ? TColor.darkAccent
-            : TColor.primaryColor2.withOpacity(0.1),
-      },
-    ];
-  }
-
   Widget _buildCard({required Widget child, Color? backgroundColor}) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Container(
@@ -556,7 +500,9 @@ class _HomeViewState extends State<HomeView>
                   child: _buildCard(
                     backgroundColor: isDarkMode
                         ? TColor.darkSurface.withOpacity(0.1)
-                        : Color(int.parse(path.color.replaceAll('#', '0xFF'))).withOpacity(0.1),
+                        : Color(
+                            int.parse(path.color.replaceAll('#', '0xFF')),
+                          ).withOpacity(0.1),
                     child: InkWell(
                       onTap: () {
                         Navigator.push(
@@ -640,7 +586,9 @@ class _HomeViewState extends State<HomeView>
               (path) => Container(
                 margin: const EdgeInsets.only(bottom: 15),
                 child: _buildCard(
-                  backgroundColor: Color(int.parse(path.color.replaceAll('#', '0xFF'))).withOpacity(0.1),
+                  backgroundColor: Color(
+                    int.parse(path.color.replaceAll('#', '0xFF')),
+                  ).withOpacity(0.1),
                   child: InkWell(
                     onTap: () {
                       Navigator.push(
@@ -710,9 +658,6 @@ class _HomeViewState extends State<HomeView>
 
     final userProvider = Provider.of<UserProvider>(context);
     final user = userProvider.user;
-
-    final learningModules = _getLearningModules(context);
-    final learningPaths = _getLearningPaths(context);
 
     return Scaffold(
       backgroundColor: TColor.bgColor,
@@ -955,78 +900,9 @@ class _HomeViewState extends State<HomeView>
                 ),
               ),
               const SizedBox(height: 24),
-
               // Quick Actions
               _buildQuickActions(),
               const SizedBox(height: 24),
-
-              // Learning Section
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Learn & Improve',
-                      style: TextStyle(
-                        color: TColor.textColor,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-                    SizedBox(
-                      height: 180,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: learningModules.length,
-                        itemBuilder: (context, index) {
-                          final module = learningModules[index];
-                          return Container(
-                            width: 280,
-                            margin: const EdgeInsets.only(right: 15),
-                            child: _buildCard(
-                              backgroundColor: module['color'] as Color,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    module['icon'] as String,
-                                    style: const TextStyle(fontSize: 32),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Text(
-                                    module['title'] as String,
-                                    style: TextStyle(
-                                      color: TColor.textColor,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 5),
-                                  Text(
-                                    module['description'] as String,
-                                    style: TextStyle(
-                                      color: TColor.subTextColor,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Learning Paths
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: _buildLearningPaths(),
-              ),
             ],
           ),
         ),
