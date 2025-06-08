@@ -11,10 +11,18 @@ import 'package:hyperchat_app/view/auth/login_view.dart';
 import 'package:hyperchat_app/view/onboarding/onboarding_view.dart';
 import 'package:hyperchat_app/view/main_tab/main_tab_view.dart';
 import 'package:hyperchat_app/view/profile/profile_view.dart';
+import 'services/auth_service.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  
+  // Initialize notification service
+  final notificationService = NotificationService();
+  await notificationService.initialize();
+  await notificationService.requestPermissions();
+
   runApp(const MyApp());
 }
 

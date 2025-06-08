@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../common/theme_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../models/user_model.dart';
+import '../../services/learning_paths_initializer.dart';
 import 'edit_profile_view.dart';
 import '../../common/colo_extension.dart';
 
@@ -142,6 +143,13 @@ class _ProfileViewState extends State<ProfileView> {
               _buildSectionTitle("Support & Info"),
               _buildSupportSection(),
               const SizedBox(height: 30),
+
+              // Admin Section (only show for admin users)
+              if (user.isAdmin) ...[
+                _buildSectionTitle("Admin"),
+                _buildAdminSection(),
+                const SizedBox(height: 30),
+              ],
 
               // Logout Button
               SizedBox(
@@ -519,78 +527,106 @@ class _ProfileViewState extends State<ProfileView> {
   }
 
   Widget _buildSupportSection() {
-    return Column(
-      children: [
-        _buildCard(
-          child: Column(
-            children: [
-              _buildSupportItem(
-                icon: Icons.help_outline,
-                title: "Help Center",
-                subtitle: "Get support and answers",
-              ),
-              const Divider(),
-              _buildSupportItem(
-                icon: Icons.privacy_tip,
-                title: "Privacy Policy",
-                subtitle: "Read our privacy policy",
-              ),
-              const Divider(),
-              _buildSupportItem(
-                icon: Icons.description,
-                title: "Terms of Service",
-                subtitle: "Read our terms of service",
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSupportItem({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
+    return _buildCard(
+      child: Column(
         children: [
-          Icon(
-            icon,
-            color: TColor.primaryColor1,
-            size: 24,
+          _buildListTile(
+            icon: Icons.help_outline,
+            title: "Help & Support",
+            onTap: () {
+              // TODO: Navigate to help & support
+            },
           ),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: TColor.textColor,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: TColor.subTextColor,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
+          _buildDivider(),
+          _buildListTile(
+            icon: Icons.info_outline,
+            title: "About",
+            onTap: () {
+              // TODO: Navigate to about
+            },
           ),
-          Icon(
-            Icons.chevron_right,
-            color: TColor.subTextColor,
+          _buildDivider(),
+          _buildListTile(
+            icon: Icons.privacy_tip_outlined,
+            title: "Privacy Policy",
+            onTap: () {
+              // TODO: Navigate to privacy policy
+            },
+          ),
+          _buildDivider(),
+          _buildListTile(
+            icon: Icons.description_outlined,
+            title: "Terms of Service",
+            onTap: () {
+              // TODO: Navigate to terms of service
+            },
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildAdminSection() {
+    return _buildCard(
+      child: Column(
+        children: [
+          _buildListTile(
+            icon: Icons.school,
+            title: "Initialize Learning Paths",
+            onTap: () async {
+              try {
+                final initializer = LearningPathsInitializer();
+                await initializer.initializeLearningPaths();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Learning paths initialized successfully!'),
+                      backgroundColor: TColor.primaryColor1,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error initializing learning paths: ${e.toString()}'),
+                      backgroundColor: TColor.error,
+                    ),
+                  );
+                }
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListTile({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(
+        icon,
+        color: TColor.primaryColor1,
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: TColor.textColor,
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      onTap: onTap,
+    );
+  }
+
+  Widget _buildDivider() {
+    return Divider(
+      color: TColor.subTextColor,
     );
   }
 }

@@ -5,12 +5,14 @@ class UserModel {
   final BasicInfo basicInfo;
   final HealthBackground healthBackground;
   final MeasurementContext measurementContext;
+  final bool isAdmin;
 
   UserModel({
     required this.id,
     required this.basicInfo,
     required this.healthBackground,
     required this.measurementContext,
+    this.isAdmin = false,
   });
 
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
@@ -20,6 +22,7 @@ class UserModel {
       basicInfo: BasicInfo.fromMap(data['basicInfo'] ?? {}),
       healthBackground: HealthBackground.fromMap(data['healthBackground'] ?? {}),
       measurementContext: MeasurementContext.fromMap(data['measurementContext'] ?? {}),
+      isAdmin: data['isAdmin'] ?? false,
     );
   }
 
@@ -28,6 +31,7 @@ class UserModel {
       'basicInfo': basicInfo.toMap(),
       'healthBackground': healthBackground.toMap(),
       'measurementContext': measurementContext.toMap(),
+      'isAdmin': isAdmin,
     };
   }
 
@@ -36,12 +40,14 @@ class UserModel {
     BasicInfo? basicInfo,
     HealthBackground? healthBackground,
     MeasurementContext? measurementContext,
+    bool? isAdmin,
   }) {
     return UserModel(
       id: id ?? this.id,
       basicInfo: basicInfo ?? this.basicInfo,
       healthBackground: healthBackground ?? this.healthBackground,
       measurementContext: measurementContext ?? this.measurementContext,
+      isAdmin: isAdmin ?? this.isAdmin,
     );
   }
 }

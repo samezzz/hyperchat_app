@@ -3,10 +3,12 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  awesome_notifications
   cloud_firestore
   firebase_auth
   firebase_core
   firebase_storage
+  flutter_tts
   permission_handler_windows
   share_plus
   simple_animation_progress_bar

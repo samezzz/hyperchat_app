@@ -9,6 +9,10 @@ import '../../services/measurement_service.dart';
 import '../../model/measurement.dart';
 import '../../services/tip_service.dart';
 import 'dart:async';
+import '../../services/learning_service.dart';
+import '../../model/learning_path.dart';
+import '../learning/learning_path_view.dart';
+import '../dialogs/set_reminder_dialog.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -28,6 +32,7 @@ class _HomeViewState extends State<HomeView>
   StreamSubscription? _measurementSubscription;
   final TipService _tipService = TipService();
   bool _isLoadingTip = false;
+  final LearningService _learningService = LearningService();
 
   @override
   void initState() {
@@ -283,7 +288,10 @@ class _HomeViewState extends State<HomeView>
                 title: 'Set Reminder',
                 subtitle: 'Add measurement or medication reminders',
                 onTap: () {
-                  // TODO: Implement reminder setting
+                  showDialog(
+                    context: context,
+                    builder: (context) => const SetReminderDialog(),
+                  );
                 },
               ),
               _buildQuickActionCard(
@@ -337,51 +345,57 @@ class _HomeViewState extends State<HomeView>
     required String subtitle,
     required VoidCallback onTap,
   }) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Container(
+      width: 160,
+      height: 120,
       margin: const EdgeInsets.only(right: 16),
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 160,
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            color: isDarkMode ? TColor.darkSurface : TColor.white,
-            borderRadius: BorderRadius.circular(15),
-            boxShadow: [
-              BoxShadow(
-                color: TColor.black.withAlpha(13),
-                blurRadius: 10,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                icon,
-                color: TColor.primaryColor1,
-                size: 24,
-              ),
-              const SizedBox(height: 10),
-              Text(
-                title,
-                style: TextStyle(
-                  color: TColor.textColor,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: TColor.secondaryColor2.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Icon(
+                  icon,
+                  color: TColor.primaryColor1,
+                  size: 24,
                 ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  color: TColor.subTextColor,
-                  fontSize: 12,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: TColor.textColor,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: TColor.subTextColor,
+                        fontSize: 12,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -502,6 +516,197 @@ class _HomeViewState extends State<HomeView>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildLearningPaths() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    return StreamBuilder<List<LearningPath>>(
+      stream: _learningService.getLearningPaths(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'Error loading learning paths',
+              style: TextStyle(color: TColor.subTextColor),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          // If no data in Firestore, use default learning paths
+          final defaultPaths = _learningService.getDefaultLearningPaths();
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  'Learning Paths',
+                  style: TextStyle(
+                    color: TColor.textColor,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 15),
+              ...defaultPaths.map(
+                (path) => Container(
+                  margin: const EdgeInsets.only(bottom: 15),
+                  child: _buildCard(
+                    backgroundColor: isDarkMode
+                        ? TColor.darkSurface
+                        : Color(int.parse(path.color.replaceAll('#', '0xFF'))),
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => LearningPathView(path: path),
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(16),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Text(
+                              path.icon,
+                              style: const TextStyle(fontSize: 24),
+                            ),
+                            const SizedBox(width: 15),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    path.title,
+                                    style: TextStyle(
+                                      color: TColor.textColor,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 5),
+                                  Text(
+                                    '${path.completedLessons}/${path.totalLessons} completed',
+                                    style: TextStyle(
+                                      color: TColor.subTextColor,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  LinearProgressIndicator(
+                                    value: path.progress,
+                                    backgroundColor: isDarkMode
+                                        ? TColor.darkGray
+                                        : TColor.secondaryColor2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      TColor.primaryColor1,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
+        final paths = snapshot.data!;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                'Learning Paths',
+                style: TextStyle(
+                  color: TColor.textColor,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            const SizedBox(height: 15),
+            ...paths.map(
+              (path) => Container(
+                margin: const EdgeInsets.only(bottom: 15),
+                child: _buildCard(
+                  backgroundColor: isDarkMode
+                      ? TColor.darkSurface
+                      : Color(int.parse(path.color.replaceAll('#', '0xFF'))),
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => LearningPathView(path: path),
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Text(
+                            path.icon,
+                            style: const TextStyle(fontSize: 24),
+                          ),
+                          const SizedBox(width: 15),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  path.title,
+                                  style: TextStyle(
+                                    color: TColor.textColor,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 5),
+                                Text(
+                                  '${path.completedLessons}/${path.totalLessons} completed',
+                                  style: TextStyle(
+                                    color: TColor.subTextColor,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                LinearProgressIndicator(
+                                  value: path.progress,
+                                  backgroundColor: isDarkMode
+                                      ? TColor.darkGray
+                                      : TColor.secondaryColor2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    TColor.primaryColor1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -829,74 +1034,7 @@ class _HomeViewState extends State<HomeView>
               // Learning Paths
               Padding(
                 padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Learning Paths',
-                      style: TextStyle(
-                        color: TColor.textColor,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-                    ...learningPaths.map(
-                      (path) => Container(
-                        margin: const EdgeInsets.only(bottom: 15),
-                        child: _buildCard(
-                          backgroundColor: isDarkMode
-                              ? TColor.darkSurface
-                              : path['color'] as Color,
-                          child: Row(
-                            children: [
-                              Text(
-                                path['icon'] as String,
-                                style: const TextStyle(fontSize: 24),
-                              ),
-                              const SizedBox(width: 15),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      path['title'] as String,
-                                      style: TextStyle(
-                                        color: TColor.textColor,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 5),
-                                    Text(
-                                      '${path['progress']}/${path['total']} completed',
-                                      style: TextStyle(
-                                        color: TColor.subTextColor,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    LinearProgressIndicator(
-                                      value:
-                                          (path['progress'] as int) /
-                                          (path['total'] as int),
-                                      backgroundColor: isDarkMode
-                                          ? TColor.darkGray
-                                          : TColor.secondaryColor2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        TColor.primaryColor1,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                child: _buildLearningPaths(),
               ),
             ],
           ),
