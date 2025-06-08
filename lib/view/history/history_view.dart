@@ -11,7 +11,12 @@ import '../../providers/user_provider.dart';
 import '../../view/profile/profile_view.dart';
 
 class HistoryView extends StatefulWidget {
-  const HistoryView({super.key});
+  final int initialTabIndex;
+  
+  const HistoryView({
+    super.key,
+    this.initialTabIndex = 0,
+  });
 
   @override
   State<HistoryView> createState() => _HistoryViewState();
@@ -29,7 +34,11 @@ class _HistoryViewState extends State<HistoryView> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: widget.initialTabIndex,
+    );
     _loadMeasurements();
   }
 

@@ -14,6 +14,7 @@ import '../privacy/privacy_policy_view.dart';
 import '../terms/terms_of_service_view.dart';
 import '../health/health_support_view.dart';
 import '../help/help_support_view.dart';
+import '../history/history_view.dart';
 
 class ProfileView extends StatefulWidget {
   const ProfileView({super.key});
@@ -550,45 +551,6 @@ class _ProfileViewState extends State<ProfileView> {
             ],
           ),
         ),
-        const SizedBox(height: 15),
-        _buildCard(
-          child: Column(
-            children: [
-              _buildSettingItem(
-                icon: Icons.bedtime,
-                title: "Sleep Tracking",
-                value: _sleepTrackingEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    _sleepTrackingEnabled = value;
-                  });
-                },
-              ),
-              const Divider(),
-              _buildSettingItem(
-                icon: Icons.fitness_center,
-                title: "Exercise Tracking",
-                value: _exerciseTrackingEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    _exerciseTrackingEnabled = value;
-                  });
-                },
-              ),
-              const Divider(),
-              _buildSettingItem(
-                icon: Icons.psychology,
-                title: "Stress Tracking",
-                value: _stressTrackingEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    _stressTrackingEnabled = value;
-                  });
-                },
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }
@@ -639,21 +601,31 @@ class _ProfileViewState extends State<ProfileView> {
           child: Column(
             children: [
               _buildReportItem(
-                icon: Icons.assessment,
+                icon: Icons.history,
                 title: "Blood Pressure History",
-                subtitle: "View your BP trends",
+                subtitle: "View your measurements",
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const HistoryView(initialTabIndex: 1),
+                    ),
+                  );
+                },
               ),
               const Divider(),
               _buildReportItem(
-                icon: Icons.fitness_center,
+                icon: Icons.show_chart,
                 title: "Activity Reports",
                 subtitle: "Track your progress",
-              ),
-              const Divider(),
-              _buildReportItem(
-                icon: Icons.psychology,
-                title: "Stress Analysis",
-                subtitle: "Monitor your stress levels",
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const HistoryView(initialTabIndex: 0),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -666,34 +638,38 @@ class _ProfileViewState extends State<ProfileView> {
     required IconData icon,
     required String title,
     required String subtitle,
+    VoidCallback? onTap,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Icon(icon, color: TColor.primaryColor1, size: 24),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: TColor.textColor,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
+      child: InkWell(
+        onTap: onTap,
+        child: Row(
+          children: [
+            Icon(icon, color: TColor.primaryColor1, size: 24),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: TColor.textColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                Text(
-                  subtitle,
-                  style: TextStyle(color: TColor.subTextColor, fontSize: 14),
-                ),
-              ],
+                  Text(
+                    subtitle,
+                    style: TextStyle(color: TColor.subTextColor, fontSize: 14),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Icon(Icons.chevron_right, color: TColor.subTextColor),
-        ],
+            Icon(Icons.chevron_right, color: TColor.subTextColor),
+          ],
+        ),
       ),
     );
   }
