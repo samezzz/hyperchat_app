@@ -46,10 +46,7 @@ class _LearningPathViewState extends State<LearningPathView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    widget.path.icon,
-                    style: const TextStyle(fontSize: 48),
-                  ),
+                  Text(widget.path.icon, style: const TextStyle(fontSize: 48)),
                   const SizedBox(height: 16),
                   Text(
                     widget.path.description,
@@ -62,9 +59,11 @@ class _LearningPathViewState extends State<LearningPathView> {
                   const SizedBox(height: 20),
                   LinearProgressIndicator(
                     value: widget.path.progress,
-                    backgroundColor: TColor.secondaryColor2,
+                    backgroundColor: TColor.secondaryColor2.withOpacity(0.1),
                     valueColor: AlwaysStoppedAnimation<Color>(
-                      Color(int.parse(widget.path.color.replaceAll('#', '0xFF'))),
+                      Color(
+                        int.parse(widget.path.color.replaceAll('#', '0xFF')),
+                      ),
                     ),
                     minHeight: 8,
                     borderRadius: BorderRadius.circular(4),
@@ -72,10 +71,7 @@ class _LearningPathViewState extends State<LearningPathView> {
                   const SizedBox(height: 8),
                   Text(
                     '${widget.path.completedLessons}/${widget.path.totalLessons} lessons completed',
-                    style: TextStyle(
-                      color: TColor.subTextColor,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: TColor.subTextColor, fontSize: 14),
                   ),
                 ],
               ),
@@ -111,10 +107,12 @@ class _LearningPathViewState extends State<LearningPathView> {
   }
 
   Widget _buildLessonCard(LearningLesson lesson) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    TColor.toggleDarkMode(isDarkMode);
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: TColor.secondaryColor2,
+        color: TColor.secondaryColor2.withOpacity(0.1),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -147,12 +145,16 @@ class _LearningPathViewState extends State<LearningPathView> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: Color(int.parse(widget.path.color.replaceAll('#', '0xFF'))).withOpacity(0.1),
+                    color: Color(
+                      int.parse(widget.path.color.replaceAll('#', '0xFF')),
+                    ).withOpacity(0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     lesson.isCompleted ? Icons.check : Icons.play_arrow,
-                    color: Color(int.parse(widget.path.color.replaceAll('#', '0xFF'))),
+                    color: Color(
+                      int.parse(widget.path.color.replaceAll('#', '0xFF')),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -163,7 +165,9 @@ class _LearningPathViewState extends State<LearningPathView> {
                       Text(
                         lesson.title,
                         style: TextStyle(
-                          color: TColor.black,
+                          color: isDarkMode
+                              ? TColor.white
+                              : TColor.black,
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
@@ -182,7 +186,9 @@ class _LearningPathViewState extends State<LearningPathView> {
                 if (lesson.isCompleted)
                   Icon(
                     Icons.check_circle,
-                    color: Color(int.parse(widget.path.color.replaceAll('#', '0xFF'))),
+                    color: Color(
+                      int.parse(widget.path.color.replaceAll('#', '0xFF')),
+                    ),
                   ),
               ],
             ),
@@ -191,4 +197,4 @@ class _LearningPathViewState extends State<LearningPathView> {
       ),
     );
   }
-} 
+}

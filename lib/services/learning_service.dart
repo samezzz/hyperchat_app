@@ -7,10 +7,7 @@ class LearningService {
 
   // Get all learning paths
   Stream<List<LearningPath>> getLearningPaths() {
-    return _firestore
-        .collection(_collection)
-        .snapshots()
-        .map((snapshot) {
+    return _firestore.collection(_collection).snapshots().map((snapshot) {
       return snapshot.docs.map((doc) {
         final data = doc.data();
         return LearningPath(
@@ -55,12 +52,12 @@ class LearningService {
     try {
       final pathRef = _firestore.collection(_collection).doc(pathId);
       final path = await pathRef.get();
-      
+
       if (!path.exists) return;
 
       final data = path.data()!;
       final lessons = List<Map<String, dynamic>>.from(data['lessons'] ?? []);
-      
+
       // Find and update the lesson
       for (var i = 0; i < lessons.length; i++) {
         if (lessons[i]['id'] == lessonId) {
@@ -70,7 +67,9 @@ class LearningService {
       }
 
       // Update completed lessons count
-      final completedCount = lessons.where((l) => l['isCompleted'] == true).length;
+      final completedCount = lessons
+          .where((l) => l['isCompleted'] == true)
+          .length;
 
       await pathRef.update({
         'lessons': lessons,
@@ -90,7 +89,7 @@ class LearningService {
         title: lesson['title'] ?? '',
         content: lesson['content'] ?? '',
         videoUrl: lesson['videoUrl'],
-        resources: lesson['resources'] != null 
+        resources: lesson['resources'] != null
             ? List<String>.from(lesson['resources'])
             : null,
         isCompleted: lesson['isCompleted'] ?? false,
@@ -114,8 +113,9 @@ class LearningService {
           LearningLesson(
             id: 'lesson1',
             title: 'Understanding Blood Pressure',
-            content: '''Blood pressure is the force of blood pushing against the walls of your arteries. It's measured in millimeters of mercury (mmHg) and consists of two numbers:
-            
+            content:
+                '''Blood pressure is the force of blood pushing against the walls of your arteries. It's measured in millimeters of mercury (mmHg) and consists of two numbers:
+
 • Systolic pressure (top number): The pressure when your heart beats
 • Diastolic pressure (bottom number): The pressure when your heart rests between beats
 
@@ -164,7 +164,8 @@ Normal blood pressure is below 120/80 mmHg. Hypertension is diagnosed when readi
           LearningLesson(
             id: 'lesson4',
             title: 'Symptoms and Complications',
-            content: '''Hypertension is often called the "silent killer" because it may not show symptoms. However, some people may experience:
+            content:
+                '''Hypertension is often called the "silent killer" because it may not show symptoms. However, some people may experience:
 
 • Headaches
 • Shortness of breath
@@ -184,7 +185,8 @@ Untreated hypertension can lead to serious complications:
           LearningLesson(
             id: 'lesson5',
             title: 'Diagnosis and Monitoring',
-            content: '''Regular blood pressure monitoring is crucial for diagnosis and management:
+            content:
+                '''Regular blood pressure monitoring is crucial for diagnosis and management:
 
 • Home monitoring
 • 24-hour ambulatory monitoring
@@ -199,7 +201,8 @@ Untreated hypertension can lead to serious complications:
       LearningPath(
         id: 'medication_management',
         title: 'Medication Management',
-        description: 'Learn about hypertension medications and how to manage them effectively',
+        description:
+            'Learn about hypertension medications and how to manage them effectively',
         icon: '💊',
         totalLessons: 5,
         completedLessons: 0,
@@ -305,4 +308,4 @@ Important interactions to be aware of:
       ),
     ];
   }
-} 
+}

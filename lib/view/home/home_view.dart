@@ -122,9 +122,7 @@ class _HomeViewState extends State<HomeView>
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Container(
           padding: const EdgeInsets.all(20),
           child: Column(
@@ -175,10 +173,7 @@ class _HomeViewState extends State<HomeView>
                 ),
                 child: const Text(
                   "Got it!",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
@@ -194,45 +189,52 @@ class _HomeViewState extends State<HomeView>
         'icon': '🧂',
         'title': 'Sodium Myths',
         'description': 'Learn the truth about salt and blood pressure',
-        'color': TColor.primaryColor2,
+        'color': TColor.primaryColor2.withOpacity(0.1),
       },
       {
         'icon': '🧘',
         'title': 'Breathing Exercises',
         'description': 'Simple techniques to lower your BP naturally',
-        'color': TColor.secondaryColor1,
+        'color': TColor.secondaryColor1.withOpacity(0.1),
       },
       {
         'icon': '📈',
         'title': 'Understanding Your BP Numbers',
         'description': 'What do your readings really mean?',
-        'color': TColor.primaryColor2,
+        'color': TColor.primaryColor2.withOpacity(0.1),
       },
     ];
   }
 
   List<Map<String, dynamic>> _getLearningPaths(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return [
       {
         'title': 'Hypertension Basics',
         'progress': 15,
         'total': 15,
         'icon': '✅',
-        'color': TColor.primaryColor2,
+        'color': isDarkMode
+            ? TColor.darkPrimary
+            : TColor.primaryColor1.withOpacity(0.1),
       },
       {
         'title': 'Medication Management',
         'progress': 4,
         'total': 10,
         'icon': '⏳',
-        'color': TColor.secondaryColor1,
+        'color': isDarkMode
+            ? TColor.darkSecondary
+            : TColor.secondaryColor1.withOpacity(0.1),
       },
       {
         'title': 'Healthy Eating for BP',
         'progress': 0,
         'total': 20,
         'icon': '📖',
-        'color': TColor.primaryColor2,
+        'color': isDarkMode
+            ? TColor.darkAccent
+            : TColor.primaryColor2.withOpacity(0.1),
       },
     ];
   }
@@ -364,11 +366,7 @@ class _HomeViewState extends State<HomeView>
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(
-                  icon,
-                  color: TColor.primaryColor1,
-                  size: 24,
-                ),
+                Icon(icon, color: TColor.primaryColor1, size: 24),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -521,7 +519,7 @@ class _HomeViewState extends State<HomeView>
 
   Widget _buildLearningPaths() {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     return StreamBuilder<List<LearningPath>>(
       stream: _learningService.getLearningPaths(),
       builder: (context, snapshot) {
@@ -557,8 +555,8 @@ class _HomeViewState extends State<HomeView>
                   margin: const EdgeInsets.only(bottom: 15),
                   child: _buildCard(
                     backgroundColor: isDarkMode
-                        ? TColor.darkSurface
-                        : Color(int.parse(path.color.replaceAll('#', '0xFF'))),
+                        ? TColor.darkSurface.withOpacity(0.1)
+                        : Color(int.parse(path.color.replaceAll('#', '0xFF'))).withOpacity(0.1),
                     child: InkWell(
                       onTap: () {
                         Navigator.push(
@@ -642,9 +640,7 @@ class _HomeViewState extends State<HomeView>
               (path) => Container(
                 margin: const EdgeInsets.only(bottom: 15),
                 child: _buildCard(
-                  backgroundColor: isDarkMode
-                      ? TColor.darkSurface
-                      : Color(int.parse(path.color.replaceAll('#', '0xFF'))),
+                  backgroundColor: Color(int.parse(path.color.replaceAll('#', '0xFF'))).withOpacity(0.1),
                   child: InkWell(
                     onTap: () {
                       Navigator.push(
@@ -659,10 +655,7 @@ class _HomeViewState extends State<HomeView>
                       padding: const EdgeInsets.all(16),
                       child: Row(
                         children: [
-                          Text(
-                            path.icon,
-                            style: const TextStyle(fontSize: 24),
-                          ),
+                          Text(path.icon, style: const TextStyle(fontSize: 24)),
                           const SizedBox(width: 15),
                           Expanded(
                             child: Column(
@@ -688,8 +681,8 @@ class _HomeViewState extends State<HomeView>
                                 LinearProgressIndicator(
                                   value: path.progress,
                                   backgroundColor: isDarkMode
-                                      ? TColor.darkGray
-                                      : TColor.secondaryColor2,
+                                      ? TColor.darkGray.withOpacity(0.5)
+                                      : TColor.secondaryColor2.withOpacity(0.5),
                                   valueColor: AlwaysStoppedAnimation<Color>(
                                     TColor.primaryColor1,
                                   ),
@@ -993,9 +986,7 @@ class _HomeViewState extends State<HomeView>
                             width: 280,
                             margin: const EdgeInsets.only(right: 15),
                             child: _buildCard(
-                              backgroundColor: isDarkMode
-                                  ? TColor.darkSurface
-                                  : module['color'] as Color,
+                              backgroundColor: module['color'] as Color,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
