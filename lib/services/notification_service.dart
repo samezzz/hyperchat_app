@@ -40,12 +40,13 @@ class NotificationService {
     );
   }
 
-  Future<void> requestPermissions() async {
-    await AwesomeNotifications().isNotificationAllowed().then((isAllowed) {
-      if (!isAllowed) {
-        AwesomeNotifications().requestPermissionToSendNotifications();
-      }
-    });
+  Future<bool> requestPermissions() async {
+    final isAllowed = await AwesomeNotifications().isNotificationAllowed();
+    if (!isAllowed) {
+      await AwesomeNotifications().requestPermissionToSendNotifications();
+      return await AwesomeNotifications().isNotificationAllowed();
+    }
+    return true;
   }
 
   Future<void> scheduleDailyReminder({

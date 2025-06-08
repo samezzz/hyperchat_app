@@ -7,6 +7,13 @@ import '../../models/user_model.dart';
 import '../../services/learning_paths_initializer.dart';
 import 'edit_profile_view.dart';
 import '../../common/colo_extension.dart';
+import 'package:awesome_notifications/awesome_notifications.dart';
+import '../../services/notification_service.dart';
+import '../about/about_view.dart';
+import '../privacy/privacy_policy_view.dart';
+import '../terms/terms_of_service_view.dart';
+import '../health/health_support_view.dart';
+import '../help/help_support_view.dart';
 
 class ProfileView extends StatefulWidget {
   const ProfileView({super.key});
@@ -27,19 +34,209 @@ class _ProfileViewState extends State<ProfileView> {
     'Diabetes',
     'Heart Disease',
     'Kidney Disease',
-    'None'
+    'None',
   ];
+
+  final NotificationService _notificationService = NotificationService();
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    _checkNotificationPermission();
   }
 
   Future<void> _loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      await Provider.of<UserProvider>(context, listen: false).loadUser(user.uid);
+      await Provider.of<UserProvider>(
+        context,
+        listen: false,
+      ).loadUser(user.uid);
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      if (userProvider.user != null) {
+        setState(() {
+          _dataSharingEnabled = userProvider.user!.dataSharingEnabled;
+        });
+      }
+    }
+  }
+
+  Future<void> _checkNotificationPermission() async {
+    final isAllowed = await AwesomeNotifications().isNotificationAllowed();
+    if (mounted) {
+      setState(() {
+        _notificationsEnabled = isAllowed;
+      });
+    }
+  }
+
+  Future<void> _handleNotificationToggle(bool value) async {
+    if (value) {
+      final isAllowed = await _notificationService.requestPermissions();
+      if (mounted) {
+        setState(() {
+          _notificationsEnabled = isAllowed;
+        });
+      }
+    } else {
+      // Show a dialog to confirm disabling notifications
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(
+              'Disable Notifications',
+              style: TextStyle(
+                color: TColor.textColor,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            content: Text(
+              'Are you sure you want to disable notifications? You may miss important reminders for blood pressure checks.',
+              style: TextStyle(color: TColor.textColor, fontSize: 16),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: TColor.subTextColor, fontSize: 16),
+                ),
+              ),
+              TextButton(
+                onPressed: () async {
+                  await _notificationService.cancelAllReminders();
+                  if (mounted) {
+                    setState(() {
+                      _notificationsEnabled = false;
+                    });
+                    Navigator.pop(context);
+                  }
+                },
+                child: Text(
+                  'Disable',
+                  style: TextStyle(
+                    color: TColor.primaryColor1,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleDataSharingToggle(bool value) async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final user = userProvider.user;
+
+    if (user == null) return;
+
+    if (value) {
+      // Show confirmation dialog when enabling data sharing
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(
+              'Enable Data Sharing',
+              style: TextStyle(
+                color: TColor.textColor,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            content: Text(
+              'Enabling data sharing allows you to export your blood pressure measurements. Your data will only be shared when you explicitly choose to export it.',
+              style: TextStyle(color: TColor.textColor, fontSize: 16),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: TColor.subTextColor, fontSize: 16),
+                ),
+              ),
+              TextButton(
+                onPressed: () async {
+                  final updatedUser = user.copyWith(dataSharingEnabled: true);
+                  await userProvider.updateUser(updatedUser);
+                  if (mounted) {
+                    setState(() {
+                      _dataSharingEnabled = true;
+                    });
+                    Navigator.pop(context);
+                  }
+                },
+                child: Text(
+                  'Enable',
+                  style: TextStyle(
+                    color: TColor.primaryColor1,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+    } else {
+      // Show confirmation dialog when disabling data sharing
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(
+              'Disable Data Sharing',
+              style: TextStyle(
+                color: TColor.textColor,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            content: Text(
+              'Disabling data sharing will prevent you from exporting your blood pressure measurements. You can enable it again at any time.',
+              style: TextStyle(color: TColor.textColor, fontSize: 16),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: TColor.subTextColor, fontSize: 16),
+                ),
+              ),
+              TextButton(
+                onPressed: () async {
+                  final updatedUser = user.copyWith(dataSharingEnabled: false);
+                  await userProvider.updateUser(updatedUser);
+                  if (mounted) {
+                    setState(() {
+                      _dataSharingEnabled = false;
+                    });
+                    Navigator.pop(context);
+                  }
+                },
+                child: Text(
+                  'Disable',
+                  style: TextStyle(
+                    color: TColor.primaryColor1,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
     }
   }
 
@@ -47,16 +244,14 @@ class _ProfileViewState extends State<ProfileView> {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     TColor.toggleDarkMode(isDarkMode);
-    
+
     final userProvider = Provider.of<UserProvider>(context);
     final user = userProvider.user;
 
     if (userProvider.isLoading) {
       return Scaffold(
         body: Center(
-          child: CircularProgressIndicator(
-            color: TColor.primaryColor1,
-          ),
+          child: CircularProgressIndicator(color: TColor.primaryColor1),
         ),
       );
     }
@@ -69,10 +264,7 @@ class _ProfileViewState extends State<ProfileView> {
             children: [
               Text(
                 'No user data found',
-                style: TextStyle(
-                  color: TColor.textColor,
-                  fontSize: 16,
-                ),
+                style: TextStyle(color: TColor.textColor, fontSize: 16),
               ),
               const SizedBox(height: 16),
               ElevatedButton(
@@ -104,10 +296,7 @@ class _ProfileViewState extends State<ProfileView> {
         backgroundColor: TColor.bgColor,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back,
-            color: TColor.textColor,
-          ),
+          icon: Icon(Icons.arrow_back, color: TColor.textColor),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -184,10 +373,7 @@ class _ProfileViewState extends State<ProfileView> {
                   ),
                   child: const Text(
                     "Logout",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -202,7 +388,7 @@ class _ProfileViewState extends State<ProfileView> {
 
   Widget _buildHeaderSection(UserModel user) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     return _buildCard(
       child: Column(
         children: [
@@ -212,7 +398,9 @@ class _ProfileViewState extends State<ProfileView> {
                 radius: 30,
                 backgroundColor: TColor.primaryColor1,
                 child: Text(
-                  user.basicInfo.fullName.isNotEmpty ? user.basicInfo.fullName[0].toUpperCase() : '?',
+                  user.basicInfo.fullName.isNotEmpty
+                      ? user.basicInfo.fullName[0].toUpperCase()
+                      : '?',
                   style: TextStyle(
                     color: TColor.white,
                     fontSize: 24,
@@ -253,10 +441,7 @@ class _ProfileViewState extends State<ProfileView> {
                     ),
                   );
                 },
-                icon: Icon(
-                  Icons.edit,
-                  color: TColor.primaryColor1,
-                ),
+                icon: Icon(Icons.edit, color: TColor.primaryColor1),
               ),
             ],
           ),
@@ -265,15 +450,14 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  Widget _buildCard({
-    required Widget child,
-    Color? backgroundColor,
-  }) {
+  Widget _buildCard({required Widget child, Color? backgroundColor}) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: backgroundColor ?? (isDarkMode ? TColor.darkSurface : TColor.cardColor),
+        color:
+            backgroundColor ??
+            (isDarkMode ? TColor.darkSurface : TColor.cardColor),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isDarkMode ? Colors.white12 : Colors.grey.shade200,
@@ -307,7 +491,7 @@ class _ProfileViewState extends State<ProfileView> {
 
   Widget _buildSettingsSection(UserModel user) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    
+
     return Column(
       children: [
         _buildCard(
@@ -319,7 +503,9 @@ class _ProfileViewState extends State<ProfileView> {
                 child: Row(
                   children: [
                     Icon(
-                      themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode,
+                      themeProvider.isDarkMode
+                          ? Icons.dark_mode
+                          : Icons.light_mode,
                       color: TColor.primaryColor1,
                       size: 24,
                     ),
@@ -340,7 +526,9 @@ class _ProfileViewState extends State<ProfileView> {
                         themeProvider.toggleTheme();
                       },
                       activeColor: TColor.primaryColor1,
-                      activeTrackColor: TColor.primaryColor1.withAlpha(77), // 0.3 * 255
+                      activeTrackColor: TColor.primaryColor1.withAlpha(
+                        77,
+                      ), // 0.3 * 255
                     ),
                   ],
                 ),
@@ -350,22 +538,14 @@ class _ProfileViewState extends State<ProfileView> {
                 icon: Icons.notifications,
                 title: "Notifications",
                 value: _notificationsEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    _notificationsEnabled = value;
-                  });
-                },
+                onChanged: _handleNotificationToggle,
               ),
               const Divider(),
               _buildSettingItem(
                 icon: Icons.share,
                 title: "Data Sharing",
                 value: _dataSharingEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    _dataSharingEnabled = value;
-                  });
-                },
+                onChanged: _handleDataSharingToggle,
               ),
             ],
           ),
@@ -416,37 +596,39 @@ class _ProfileViewState extends State<ProfileView> {
   Widget _buildSettingItem({
     required IconData icon,
     required String title,
-    required bool value,
-    required ValueChanged<bool> onChanged,
+    bool? value,
+    ValueChanged<bool>? onChanged,
+    VoidCallback? onTap,
   }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            color: TColor.primaryColor1,
-            size: 24,
-          ),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                color: TColor.textColor,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
+    Widget content = Row(
+      children: [
+        Icon(icon, color: TColor.primaryColor1, size: 24),
+        const SizedBox(width: 15),
+        Expanded(
+          child: Text(
+            title,
+            style: TextStyle(
+              color: TColor.textColor,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
             ),
           ),
+        ),
+        if (onTap != null)
+          Icon(Icons.arrow_forward_ios, color: TColor.subTextColor, size: 16)
+        else if (value != null && onChanged != null)
           Switch(
             value: value,
             onChanged: onChanged,
             activeColor: TColor.primaryColor1,
             activeTrackColor: TColor.primaryColor1.withAlpha(77), // 0.3 * 255
           ),
-        ],
-      ),
+      ],
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: onTap != null ? InkWell(onTap: onTap, child: content) : content,
     );
   }
 
@@ -489,11 +671,7 @@ class _ProfileViewState extends State<ProfileView> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(
-            icon,
-            color: TColor.primaryColor1,
-            size: 24,
-          ),
+          Icon(icon, color: TColor.primaryColor1, size: 24),
           const SizedBox(width: 15),
           Expanded(
             child: Column(
@@ -509,18 +687,12 @@ class _ProfileViewState extends State<ProfileView> {
                 ),
                 Text(
                   subtitle,
-                  style: TextStyle(
-                    color: TColor.subTextColor,
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: TColor.subTextColor, fontSize: 14),
                 ),
               ],
             ),
           ),
-          Icon(
-            Icons.chevron_right,
-            color: TColor.subTextColor,
-          ),
+          Icon(Icons.chevron_right, color: TColor.subTextColor),
         ],
       ),
     );
@@ -530,36 +702,55 @@ class _ProfileViewState extends State<ProfileView> {
     return _buildCard(
       child: Column(
         children: [
-          _buildListTile(
+          _buildSettingItem(
             icon: Icons.help_outline,
             title: "Help & Support",
-            onTap: () {
-              // TODO: Navigate to help & support
-            },
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const HelpSupportView()),
+            ),
           ),
           _buildDivider(),
-          _buildListTile(
+          _buildSettingItem(
+            icon: Icons.medical_services_outlined,
+            title: "Health Resources",
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const HealthSupportView(),
+              ),
+            ),
+          ),
+          _buildDivider(),
+          _buildSettingItem(
             icon: Icons.info_outline,
             title: "About",
-            onTap: () {
-              // TODO: Navigate to about
-            },
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AboutView()),
+            ),
           ),
           _buildDivider(),
-          _buildListTile(
+          _buildSettingItem(
             icon: Icons.privacy_tip_outlined,
             title: "Privacy Policy",
-            onTap: () {
-              // TODO: Navigate to privacy policy
-            },
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const PrivacyPolicyView(),
+              ),
+            ),
           ),
           _buildDivider(),
-          _buildListTile(
+          _buildSettingItem(
             icon: Icons.description_outlined,
             title: "Terms of Service",
-            onTap: () {
-              // TODO: Navigate to terms of service
-            },
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const TermsOfServiceView(),
+              ),
+            ),
           ),
         ],
       ),
@@ -589,7 +780,9 @@ class _ProfileViewState extends State<ProfileView> {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Error initializing learning paths: ${e.toString()}'),
+                      content: Text(
+                        'Error initializing learning paths: ${e.toString()}',
+                      ),
                       backgroundColor: TColor.error,
                     ),
                   );
@@ -608,10 +801,7 @@ class _ProfileViewState extends State<ProfileView> {
     required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: Icon(
-        icon,
-        color: TColor.primaryColor1,
-      ),
+      leading: Icon(icon, color: TColor.primaryColor1),
       title: Text(
         title,
         style: TextStyle(
@@ -625,8 +815,6 @@ class _ProfileViewState extends State<ProfileView> {
   }
 
   Widget _buildDivider() {
-    return Divider(
-      color: TColor.subTextColor,
-    );
+    return Divider(color: TColor.subTextColor);
   }
 }

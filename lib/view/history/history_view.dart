@@ -6,6 +6,9 @@ import '../../model/measurement.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import '../../services/export_service.dart';
+import 'package:provider/provider.dart';
+import '../../providers/user_provider.dart';
+import '../../view/profile/profile_view.dart';
 
 class HistoryView extends StatefulWidget {
   const HistoryView({super.key});
@@ -417,6 +420,66 @@ class _HistoryViewState extends State<HistoryView> with SingleTickerProviderStat
 
   Future<void> _exportToCSV() async {
     if (_isExporting) return;
+
+    // Check if data sharing is enabled
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final user = userProvider.user;
+    
+    if (user == null || !user.dataSharingEnabled) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(
+            'Data Sharing Disabled',
+            style: TextStyle(
+              color: TColor.textColor,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          content: Text(
+            'Please enable data sharing in your profile settings to export your measurements.',
+            style: TextStyle(
+              color: TColor.textColor,
+              fontSize: 16,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: TColor.subTextColor,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ProfileView(),
+                  ),
+                );
+              },
+              child: Text(
+                'Go to Profile',
+                style: TextStyle(
+                  color: TColor.primaryColor1,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _isExporting = true;
