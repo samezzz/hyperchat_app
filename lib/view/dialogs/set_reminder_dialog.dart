@@ -188,6 +188,7 @@ class _SetReminderDialogState extends State<SetReminderDialog> {
                   onPressed: _setReminder,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: TColor.primaryColor1,
+                    foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
