@@ -28,7 +28,7 @@ class _RegisterViewState extends State<RegisterView> {
   bool _isFirstTime = true;
   bool _acceptedTerms = false;
 
-  final List<String> _genders = ['Male', 'Female', 'Other'];
+  final List<String> _genders = ['Male', 'Female'];
 
   @override
   void initState() {

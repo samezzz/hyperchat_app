@@ -34,7 +34,7 @@ class _EditProfileViewState extends State<EditProfileView> {
   late bool _flashlightPermission;
   bool _isLoading = false;
 
-  final List<String> _genders = ['Male', 'Female', 'Other'];
+  final List<String> _genders = ['Male', 'Female'];
   final List<String> _conditions = [
     'Diabetes',
     'Chronic Kidney Disease',
