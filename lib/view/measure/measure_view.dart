@@ -54,6 +54,11 @@ class _MeasureViewState extends State<MeasureView>
   static const int _measurementDuration = 15; // Measurement duration in seconds
   int _elapsedSeconds = 0;
 
+  bool _isPaused = false;  // Track pause state
+  int _totalPausedMilliseconds = 0;
+  DateTime? _measurementStartTime;
+  DateTime? _lastPauseTime;
+
   @override
   void initState() {
     super.initState();
@@ -203,6 +208,10 @@ class _MeasureViewState extends State<MeasureView>
         measurementProgress = 0.0;
         _estimatedBPM = 0;
         _elapsedSeconds = 0;
+        _totalPausedMilliseconds = 0;
+        _measurementStartTime = DateTime.now();
+        _lastPauseTime = null;
+        _isPaused = false;
       });
     }
 
@@ -219,10 +228,71 @@ class _MeasureViewState extends State<MeasureView>
   }
 
   void _startImageStream() {
-    _cameraController!.startImageStream((CameraImage image) {
-      // Send image to the isolate for processing
-      _sendPort?.send(image);
-    });
+    if (_cameraController == null || !_isCameraInitialized) return;
+
+    try {
+      _cameraController!.startImageStream((CameraImage image) {
+        if (isMeasuring) {
+          // Calculate average brightness from Y plane for finger detection
+          double avgBrightness = 0;
+          if (image.planes.isNotEmpty) {
+            avgBrightness = image.planes[0].bytes.reduce((value, element) => value + element) /
+                image.planes[0].bytes.length;
+          }
+
+          // Check if finger is still present
+          bool isFingerPresent = avgBrightness < 50;
+
+          if (!isFingerPresent && !_isPaused) {
+            // Finger removed, pause measurement
+            setState(() {
+              _isPaused = true;
+              _lastPauseTime = DateTime.now();
+            });
+            
+            // Only pause the timer, keep the stream running
+            _measurementTimer?.cancel();
+            
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Measurement paused - Place your finger back on the camera to continue'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
+          } else if (isFingerPresent && _isPaused) {
+            // Finger placed back, resume measurement
+            if (_lastPauseTime != null) {
+              final pauseDuration = DateTime.now().difference(_lastPauseTime!);
+              _totalPausedMilliseconds += pauseDuration.inMilliseconds;
+            }
+            setState(() {
+              _isPaused = false;
+              _lastPauseTime = null;
+            });
+            
+            // Restart the timer with the correct progress
+            _startMeasurementTimer();
+          }
+
+          // Only send image to isolate if not paused
+          if (!_isPaused) {
+            _sendPort?.send(image);
+          }
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error starting camera stream: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        _resetMeasurement();
+      }
+    }
   }
 
   Future<void> _startProcessingIsolate() async {
@@ -250,10 +320,22 @@ class _MeasureViewState extends State<MeasureView>
   }
 
   void _startMeasurementTimer() {
+    _measurementTimer?.cancel(); // Cancel any existing timer
+    
+    // Set the start time if this is the first start
+    if (_measurementStartTime == null) {
+      _measurementStartTime = DateTime.now();
+    }
+    
     _measurementTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) {
+      if (mounted && !_isPaused) {
+        final now = DateTime.now();
+        final totalElapsedMilliseconds = now.difference(_measurementStartTime!).inMilliseconds;
+        final actualElapsedMilliseconds = totalElapsedMilliseconds - _totalPausedMilliseconds;
+        final actualElapsedSeconds = (actualElapsedMilliseconds / 1000).floor();
+        
         setState(() {
-          _elapsedSeconds = timer.tick;
+          _elapsedSeconds = actualElapsedSeconds;
           measurementProgress = _elapsedSeconds / _measurementDuration;
 
           if (_elapsedSeconds >= _measurementDuration) {
@@ -269,13 +351,25 @@ class _MeasureViewState extends State<MeasureView>
     _cameraController?.stopImageStream();
     _processingIsolate?.kill();
     _receivePort?.close();
-    _measurementTimer?.cancel(); // Ensure timer is cancelled
-    WakelockPlus.disable(); // Allow screen to turn off
+    _measurementTimer?.cancel();
+    WakelockPlus.disable();
 
+    // Only show results if we have a valid measurement
     if (mounted) {
       setState(() {
         isMeasuring = false;
-        _showResults = true; // Set to true to show results view
+        // Only show results if we have a valid BPM and completed the measurement
+        _showResults = _estimatedBPM > 0 && _elapsedSeconds >= _measurementDuration;
+        if (!_showResults) {
+          // If measurement was invalid, reset and show error
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Measurement incomplete. Please try again.'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+          _resetMeasurement();
+        }
       });
     }
   }
@@ -441,8 +535,12 @@ class _MeasureViewState extends State<MeasureView>
     });
   }
 
-  void _resetMeasurement() {
-    _stopMeasurement(); // Ensure everything is stopped
+  void _resetMeasurement() async {
+    // Stop all ongoing processes
+    _processingIsolate?.kill();
+    _receivePort?.close();
+    _measurementTimer?.cancel();
+    
     if (mounted) {
       setState(() {
         _showResults = false;
@@ -450,27 +548,35 @@ class _MeasureViewState extends State<MeasureView>
         measurementProgress = 0.0;
         _estimatedBPM = 0;
         _elapsedSeconds = 0;
+        _totalPausedMilliseconds = 0;
+        _measurementStartTime = null;
+        _lastPauseTime = null;
+        _isPaused = false;
       });
     }
 
-    _toggleFlashlight(false); // Turn off flashlight
+    await _toggleFlashlight(false);
 
     // Restart finger detection after a short delay
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted && !isMeasuring && !_showResults) {
-        _startFingerDetection();
-      }
-    });
+    if (mounted) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted && !isMeasuring && !_showResults) {
+          _startFingerDetection();
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
-    _cameraController?.stopImageStream();
-    _cameraController?.dispose();
-    _processingIsolate?.kill(); // Ensure isolate is killed on dispose
+    if (_cameraController != null) {
+      _cameraController!.stopImageStream();
+      _cameraController!.dispose();
+    }
+    _processingIsolate?.kill();
     _receivePort?.close();
-    _measurementTimer?.cancel(); // Ensure timer is cancelled
+    _measurementTimer?.cancel();
     WakelockPlus.disable();
     super.dispose();
   }
@@ -550,11 +656,10 @@ class _MeasureViewState extends State<MeasureView>
   }
 
   Widget _buildMeasuringView() {
-    // This view will show the animation and progress
     return Container(
       width: double.infinity,
       height: double.infinity,
-      color: TColor.bgColor, // Or a different background if needed
+      color: TColor.bgColor,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -566,8 +671,8 @@ class _MeasureViewState extends State<MeasureView>
                 scale: _pulseAnimation.value,
                 child: Icon(
                   Icons.favorite,
-                  color: TColor.primaryColor1,
-                  size: 120, // Increased size for prominence
+                  color: _isPaused ? TColor.subTextColor : TColor.primaryColor1,
+                  size: 120,
                 ),
               );
             },
@@ -575,41 +680,37 @@ class _MeasureViewState extends State<MeasureView>
           const SizedBox(height: 40),
           // Estimated BPM display
           Text(
-            _estimatedBPM > 0 ? '${_estimatedBPM} BPM' : 'Measuring...',
+            _isPaused ? 'Measurement Paused' : (_estimatedBPM > 0 ? '${_estimatedBPM} BPM' : 'Measuring...'),
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: TColor.textColor,
-              fontSize: 32, // Increased size
+              color: _isPaused ? TColor.subTextColor : TColor.textColor,
+              fontSize: 32,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 10),
           // Progress text or instruction
           Text(
-            _elapsedSeconds >= _measurementDuration - 3
-                ? 'Finishing measurement...'
-                : // Message when nearing completion
-                  'Hold your finger steady on the camera lens with flash on.',
+            _isPaused 
+                ? 'Place your finger back on the camera to continue'
+                : (_elapsedSeconds >= _measurementDuration - 3
+                    ? 'Finishing measurement...'
+                    : 'Hold your finger steady on the camera lens with flash on.'),
             textAlign: TextAlign.center,
             style: TextStyle(color: TColor.subTextColor, fontSize: 16),
           ),
           const SizedBox(height: 40),
           // Linear progress indicator
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32.0),
+            padding: const EdgeInsets.symmetric(horizontal: 40),
             child: LinearProgressIndicator(
-              value: measurementProgress, // Use the state variable for progress
-              backgroundColor: TColor.subTextColor.withOpacity(0.3),
-              valueColor: AlwaysStoppedAnimation<Color>(TColor.primaryColor1),
+              value: _isPaused ? measurementProgress : measurementProgress,
+              backgroundColor: TColor.subTextColor.withOpacity(0.2),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                _isPaused ? TColor.subTextColor : TColor.primaryColor1,
+              ),
               minHeight: 8,
-              borderRadius: BorderRadius.circular(4),
             ),
-          ),
-          const SizedBox(height: 10),
-          // Timer display
-          Text(
-            '${_elapsedSeconds} / ${_measurementDuration} seconds',
-            style: TextStyle(color: TColor.subTextColor, fontSize: 14),
           ),
         ],
       ),
