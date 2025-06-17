@@ -126,20 +126,34 @@ class _MeasureResultViewState extends State<MeasureResultView> {
         throw Exception('User data not loaded');
       }
 
-      // Wait for both operations to complete
-      await Future.wait([
-        _measurementService.addMeasurement(
-          userId: user.uid,
-          heartRate: widget.estimatedBPM,
-          systolicBP: _calculatedBP['systolic']!,
-          diastolicBP: _calculatedBP['diastolic']!,
-          context: widget.initialContext,
-          healthBackground: userProvider.user!.healthBackground,
-          aiAnalysis: _aiAnalysis,
-        ),
-        // Add a minimum delay to ensure smooth UX
-        Future.delayed(const Duration(milliseconds: 800)),
-      ]);
+      // Start timing the minimum loading duration
+      final startTime = DateTime.now();
+
+      // Ensure we have AI analysis before saving
+      _aiAnalysis ??= await _measurementService.geminiService.analyzeMeasurement(
+        systolicBP: _calculatedBP['systolic']!,
+        diastolicBP: _calculatedBP['diastolic']!,
+        heartRate: widget.estimatedBPM,
+        context: widget.initialContext,
+        healthBackground: userProvider.user!.healthBackground,
+      );
+
+      // Save the measurement with the AI analysis
+      await _measurementService.addMeasurement(
+        userId: user.uid,
+        heartRate: widget.estimatedBPM,
+        systolicBP: _calculatedBP['systolic']!,
+        diastolicBP: _calculatedBP['diastolic']!,
+        context: widget.initialContext,
+        healthBackground: userProvider.user!.healthBackground,
+        aiAnalysis: _aiAnalysis,
+      );
+
+      // Calculate elapsed time and add delay if needed to ensure minimum loading duration
+      final elapsedTime = DateTime.now().difference(startTime);
+      if (elapsedTime < const Duration(seconds: 2)) {
+        await Future.delayed(const Duration(seconds: 2) - elapsedTime);
+      }
 
       if (mounted) {
         // First call onSave callback
