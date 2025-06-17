@@ -125,16 +125,21 @@ class _MeasureResultViewState extends State<MeasureResultView> {
       if (userProvider.user == null) {
         throw Exception('User data not loaded');
       }
-      
-      await _measurementService.addMeasurement(
-        userId: user.uid,
-        heartRate: widget.estimatedBPM,
-        systolicBP: _calculatedBP['systolic']!,
-        diastolicBP: _calculatedBP['diastolic']!,
-        context: widget.initialContext,
-        healthBackground: userProvider.user!.healthBackground,
-        aiAnalysis: _aiAnalysis,
-      );
+
+      // Wait for both operations to complete
+      await Future.wait([
+        _measurementService.addMeasurement(
+          userId: user.uid,
+          heartRate: widget.estimatedBPM,
+          systolicBP: _calculatedBP['systolic']!,
+          diastolicBP: _calculatedBP['diastolic']!,
+          context: widget.initialContext,
+          healthBackground: userProvider.user!.healthBackground,
+          aiAnalysis: _aiAnalysis,
+        ),
+        // Add a minimum delay to ensure smooth UX
+        Future.delayed(const Duration(milliseconds: 800)),
+      ]);
 
       if (mounted) {
         // First call onSave callback
@@ -153,10 +158,14 @@ class _MeasureResultViewState extends State<MeasureResultView> {
             ),
             backgroundColor: TColor.primaryColor1,
             behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.only(
+              bottom: 20,
+              left: 16,
+              right: 16,
+            ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            margin: const EdgeInsets.all(16),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -180,10 +189,14 @@ class _MeasureResultViewState extends State<MeasureResultView> {
             ),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.only(
+              bottom: 80,
+              left: 16,
+              right: 16,
+            ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            margin: const EdgeInsets.all(16),
             duration: const Duration(seconds: 2),
           ),
         );

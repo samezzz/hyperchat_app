@@ -6,7 +6,7 @@
     <uses-feature android:name="android.hardware.camera.flash" />
     
     <application
-        android:label="hyperchat_app"
+        android:label="Hyperchat 2.0"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         <activity

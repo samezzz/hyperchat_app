@@ -63,72 +63,72 @@ class _MainTabViewState extends State<MainTabView> {
             ),
           ],
         ),
-        child: BottomAppBar(
-          elevation: 0,
-          color: Colors.transparent,
-          notchMargin: 0,
-          shape: const CircularNotchedRectangle(),
-          child: Container(
-            height: 65,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Left side buttons
-                Row(
-                  children: [
-                    _buildNavItem(
-                      icon: selectTab == 0 ? Icons.home : Icons.home_outlined,
-                      isSelected: selectTab == 0,
-                      onTap: () {
-                        setState(() {
-                          selectTab = 0;
-                          currentTab = const HomeView();
-                        });
-                      },
-                    ),
-                    const SizedBox(width: 20),
-                    _buildNavItem(
-                      icon: selectTab == 2 ? Icons.chat : Icons.chat_outlined,
-                      isSelected: selectTab == 2,
-                      onTap: () {
-                        setState(() {
-                          selectTab = 2;
-                          currentTab = const ChatView();
-                        });
-                      },
-                    ),
-                  ],
-                ),
-                // Right side buttons
-                Row(
-                  children: [
-                    _buildNavItem(
-                      icon: selectTab == 3
-                          ? Icons.bar_chart
-                          : Icons.bar_chart_outlined,
-                      isSelected: selectTab == 3,
-                      onTap: () {
-                        setState(() {
-                          selectTab = 3;
-                          currentTab = const HistoryView();
-                        });
-                      },
-                    ),
-                    const SizedBox(width: 20),
-                    _buildNavItem(
-                      icon: selectTab == 4 ? Icons.insights : Icons.insights_outlined,
-                      isSelected: selectTab == 4,
-                      onTap: () {
-                        setState(() {
-                          selectTab = 4;
-                          currentTab = const InsightsView();
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ],
+        child: SafeArea(
+          child: BottomAppBar(
+            elevation: 0,
+            color: Colors.transparent,
+            notchMargin: 0,
+            shape: const CircularNotchedRectangle(),
+            child: Container(
+              height: 65,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Left side buttons
+                  Row(
+                    children: [
+                      _buildNavItem(
+                        icon: selectTab == 0 ? Icons.home : Icons.home_outlined,
+                        isSelected: selectTab == 0,
+                        onTap: () {
+                          setState(() {
+                            selectTab = 0;
+                            currentTab = const HomeView();
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 20),
+                      _buildNavItem(
+                        icon: selectTab == 2 ? Icons.chat : Icons.chat_outlined,
+                        isSelected: selectTab == 2,
+                        onTap: () {
+                          setState(() {
+                            selectTab = 2;
+                            currentTab = const ChatView();
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  // Right side buttons
+                  Row(
+                    children: [
+                      _buildNavItem(
+                        icon: selectTab == 3 ? Icons.history : Icons.history_outlined,
+                        isSelected: selectTab == 3,
+                        onTap: () {
+                          setState(() {
+                            selectTab = 3;
+                            currentTab = const HistoryView();
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 20),
+                      _buildNavItem(
+                        icon: selectTab == 4 ? Icons.insights : Icons.insights_outlined,
+                        isSelected: selectTab == 4,
+                        onTap: () {
+                          setState(() {
+                            selectTab = 4;
+                            currentTab = const InsightsView();
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),

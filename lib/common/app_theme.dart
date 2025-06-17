@@ -61,6 +61,12 @@ class AppTheme {
         color: Color(0xff1D1617),
       ),
     ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+    ),
   );
 
   static ThemeData get darkTheme => ThemeData(
@@ -93,6 +99,12 @@ class AppTheme {
       bodySmall: TextStyle(
         fontSize: 12,
         color: Color(0xffE0E0E0),
+      ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
       ),
     ),
   );
