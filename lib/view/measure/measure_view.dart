@@ -741,6 +741,44 @@ class _MeasureViewState extends State<MeasureView>
   }
 
   Widget _buildMeasuringView() {
+    // Calculate percentage completion
+    final percentage = (measurementProgress * 100).round();
+    
+    // Define measurement steps with their ranges and educational information
+    final List<Map<String, dynamic>> steps = [
+      {
+        'range': [0, 15],
+        'title': 'Step 1: Initial Signal Detection',
+        'info': 'The camera detects subtle changes in light absorption as blood flows through your finger. This is the foundation of photoplethysmography (PPG), a non-invasive way to measure blood flow.',
+      },
+      {
+        'range': [15, 35],
+        'title': 'Step 2: Signal Stabilization',
+        'info': 'The system is now analyzing the stability of your blood flow pattern. A steady signal is crucial for accurate measurements, as it helps filter out any movement artifacts.',
+      },
+      {
+        'range': [35, 65],
+        'title': 'Step 3: Heart Rate Analysis',
+        'info': 'Your heart rate is being calculated by analyzing the time between consecutive heartbeats. This interval, known as the RR interval, is key to understanding your cardiovascular health.',
+      },
+      {
+        'range': [65, 85],
+        'title': 'Step 4: Blood Pressure Estimation',
+        'info': 'Using your heart rate and signal characteristics, the system is estimating your blood pressure. This is done through advanced algorithms that correlate pulse wave characteristics with blood pressure.',
+      },
+      {
+        'range': [85, 100],
+        'title': 'Step 5: Final Analysis',
+        'info': 'The system is now performing final calculations and validating the measurements to ensure accuracy. This includes cross-checking all parameters and applying calibration factors.',
+      },
+    ];
+
+    // Find current step based on percentage
+    final currentStep = steps.firstWhere(
+      (step) => percentage >= (step['range'] as List<int>)[0] && percentage <= (step['range'] as List<int>)[1],
+      orElse: () => steps.last,
+    );
+
     return Container(
       width: double.infinity,
       height: double.infinity,
@@ -787,16 +825,63 @@ class _MeasureViewState extends State<MeasureView>
             style: TextStyle(color: TColor.subTextColor, fontSize: 16),
           ),
           const SizedBox(height: 40),
-          // Linear progress indicator
+          // Progress bar container
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: LinearProgressIndicator(
-              value: _isPaused ? measurementProgress : measurementProgress,
-              backgroundColor: TColor.subTextColor.withOpacity(0.2),
-              valueColor: AlwaysStoppedAnimation<Color>(
-                _isPaused ? TColor.subTextColor : TColor.primaryColor1,
-              ),
-              minHeight: 8,
+            child: Column(
+              children: [
+                // Linear progress indicator
+                LinearProgressIndicator(
+                  value: _isPaused ? measurementProgress : measurementProgress,
+                  backgroundColor: TColor.subTextColor.withOpacity(0.2),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    _isPaused ? TColor.subTextColor : TColor.primaryColor1,
+                  ),
+                  minHeight: 8,
+                ),
+                const SizedBox(height: 4),
+                // Percentage and step indicator row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Step indicator
+                    Expanded(
+                      child: Text(
+                        currentStep['title'] as String,
+                        style: TextStyle(
+                          color: TColor.subTextColor,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    // Percentage
+                    Text(
+                      '$percentage%',
+                      style: TextStyle(
+                        color: TColor.primaryColor1,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // Educational information
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: TColor.primaryColor1.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    currentStep['info'] as String,
+                    style: TextStyle(
+                      color: TColor.textColor,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
