@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import '../../common/colo_extension.dart';
 import '../../services/gemini_service.dart';
 
@@ -14,25 +15,9 @@ class _ChatViewState extends State<ChatView> {
   final ScrollController _scrollController = ScrollController();
   final GeminiService _geminiService = GeminiService();
   bool _isTyping = false;
+  bool _isLoadingQuestions = true;
 
-  final List<Map<String, dynamic>> _suggestedQuestions = [
-    {
-      'icon': '🍎',
-      'text': 'What foods lower BP?',
-    },
-    {
-      'icon': '🚨',
-      'text': "What's a hypertensive crisis?",
-    },
-    {
-      'icon': '📊',
-      'text': 'Explain my last reading',
-    },
-    {
-      'icon': '💊',
-      'text': 'Can I mix meds with coffee?',
-    },
-  ];
+  List<Map<String, dynamic>> _suggestedQuestions = [];
 
   final List<Map<String, dynamic>> _messages = [
     {
@@ -41,6 +26,81 @@ class _ChatViewState extends State<ChatView> {
       'timestamp': '10:30 AM',
     },
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _generateQuestions();
+  }
+
+  Future<void> _generateQuestions() async {
+    setState(() {
+      _isLoadingQuestions = true;
+    });
+
+    try {
+      final prompt = '''
+Generate 4 relevant questions about hypertension and blood pressure management. 
+For each question:
+1. Include an appropriate emoji
+2. Keep the question concise and clear
+3. Make it specific to hypertension/BP management
+4. Format as JSON array with 'icon' and 'text' fields
+
+Example format:
+[
+  {"icon": "🍎", "text": "What foods lower BP?"},
+  {"icon": "🚨", "text": "What's a hypertensive crisis?"}
+]
+
+Return only the JSON array, nothing else. Do not include any markdown formatting or code blocks.
+''';
+
+      final response = await _geminiService.getResponse(prompt);
+      
+      // Clean the response by removing markdown code blocks and any extra whitespace
+      String cleanResponse = response
+          .replaceAll('```json', '')
+          .replaceAll('```', '')
+          .trim();
+      
+      // Parse the response as JSON
+      final List<dynamic> questions = json.decode(cleanResponse);
+      
+      if (mounted) {
+        setState(() {
+          _suggestedQuestions = questions.cast<Map<String, dynamic>>();
+          _isLoadingQuestions = false;
+        });
+      }
+    } catch (e) {
+      print('Error generating questions: $e');
+      // Fallback to default questions if generation fails
+      if (mounted) {
+        setState(() {
+          _suggestedQuestions = [
+            {
+              'icon': '🍎',
+              'text': 'What foods lower BP?',
+            },
+            {
+              'icon': '🚨',
+              'text': "What's a hypertensive crisis?",
+            },
+            {
+              'icon': '📊',
+              'text': 'Explain my last reading',
+            },
+            {
+              'icon': '💊',
+              'text': 'Can I mix meds with coffee?',
+            },
+          ];
+          _isLoadingQuestions = false;
+        });
+      }
+    }
+  }
 
   Future<void> _sendMessage() async {
     if (_messageController.text.trim().isEmpty) return;
@@ -142,47 +202,68 @@ class _ChatViewState extends State<ChatView> {
           Container(
             height: 100,
             padding: const EdgeInsets.symmetric(vertical: 10),
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 15),
-              itemCount: _suggestedQuestions.length,
-              itemBuilder: (context, index) {
-                final question = _suggestedQuestions[index];
-                return Container(
-                  margin: const EdgeInsets.only(right: 10),
-                  child: ElevatedButton(
-                    onPressed: () {
-                      _messageController.text = question['text'];
-                      _sendMessage();
+            child: Stack(
+              children: [
+                if (_isLoadingQuestions)
+                  const Center(
+                    child: CircularProgressIndicator(),
+                  )
+                else
+                  ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 15),
+                    itemCount: _suggestedQuestions.length,
+                    itemBuilder: (context, index) {
+                      final question = _suggestedQuestions[index];
+                      return Container(
+                        margin: const EdgeInsets.only(right: 10),
+                        child: ElevatedButton(
+                          onPressed: () {
+                            _messageController.text = question['text'];
+                            _sendMessage();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isDarkMode ? TColor.darkSurface : TColor.white,
+                            foregroundColor: TColor.textColor,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              side: BorderSide(
+                                color: TColor.subTextColor.withAlpha(77),
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Text(
+                                question['icon'],
+                                style: const TextStyle(fontSize: 20),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                question['text'],
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isDarkMode ? TColor.darkSurface : TColor.white,
-                      foregroundColor: TColor.textColor,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        side: BorderSide(
-                          color: TColor.subTextColor.withAlpha(77),
-                        ),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Text(
-                          question['icon'],
-                          style: const TextStyle(fontSize: 20),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          question['text'],
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                      ],
-                    ),
                   ),
-                );
-              },
+                Positioned(
+                  right: 10,
+                  top: 0,
+                  child: IconButton(
+                    onPressed: _generateQuestions,
+                    icon: Icon(
+                      Icons.refresh,
+                      color: TColor.primaryColor1,
+                    ),
+                    tooltip: 'Refresh questions',
+                  ),
+                ),
+              ],
             ),
           ),
 
