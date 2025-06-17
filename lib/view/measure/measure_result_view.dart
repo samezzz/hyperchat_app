@@ -26,6 +26,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
   bool _isSaving = false;
   // Initialize with default values
   Map<String, int> _calculatedBP = {'systolic': 0, 'diastolic': 0};
+  Map<String, dynamic>? _aiAnalysis;
 
   @override
   void initState() {
@@ -132,6 +133,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
         diastolicBP: _calculatedBP['diastolic']!,
         context: widget.initialContext,
         healthBackground: userProvider.user!.healthBackground,
+        aiAnalysis: _aiAnalysis,
       );
 
       if (mounted) {
@@ -330,13 +332,18 @@ class _MeasureResultViewState extends State<MeasureResultView> {
 
               // AI Analysis Section
               FutureBuilder<Map<String, dynamic>>(
-                future: _measurementService.geminiService.analyzeMeasurement(
-                  systolicBP: _calculatedBP['systolic']!,
-                  diastolicBP: _calculatedBP['diastolic']!,
-                  heartRate: widget.estimatedBPM,
-                  context: widget.initialContext,
-                  healthBackground: Provider.of<UserProvider>(context, listen: false).user!.healthBackground,
-                ),
+                future: _aiAnalysis != null 
+                    ? Future.value(_aiAnalysis)
+                    : _measurementService.geminiService.analyzeMeasurement(
+                        systolicBP: _calculatedBP['systolic']!,
+                        diastolicBP: _calculatedBP['diastolic']!,
+                        heartRate: widget.estimatedBPM,
+                        context: widget.initialContext,
+                        healthBackground: Provider.of<UserProvider>(context, listen: false).user!.healthBackground,
+                      ).then((analysis) {
+                        _aiAnalysis = analysis;
+                        return analysis;
+                      }),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());

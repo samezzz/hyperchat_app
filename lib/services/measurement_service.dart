@@ -16,10 +16,11 @@ class MeasurementService {
     required int diastolicBP,
     required String context,
     required HealthBackground healthBackground,
+    Map<String, dynamic>? aiAnalysis,
   }) async {
     try {
-      // Get AI analysis of the measurement
-      final analysis = await geminiService.analyzeMeasurement(
+      // Get AI analysis if not provided
+      final analysis = aiAnalysis ?? await geminiService.analyzeMeasurement(
         systolicBP: systolicBP,
         diastolicBP: diastolicBP,
         heartRate: heartRate,
