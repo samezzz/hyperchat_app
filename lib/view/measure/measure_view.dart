@@ -748,20 +748,22 @@ class _MeasureViewState extends State<MeasureView>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Pulsating Heart Animation
-          AnimatedBuilder(
-            animation: _pulseAnimation,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: _pulseAnimation.value,
-                child: Icon(
-                  Icons.favorite,
-                  color: _isPaused ? TColor.subTextColor : TColor.primaryColor1,
-                  size: 120,
+          // Camera preview in circle
+          if (_cameraController != null && _cameraController!.value.isInitialized)
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: TColor.primaryColor1,
+                  width: 2,
                 ),
-              );
-            },
-          ),
+              ),
+              child: ClipOval(
+                child: CameraPreview(_cameraController!),
+              ),
+            ),
           const SizedBox(height: 40),
           // Estimated BPM display
           Text(
