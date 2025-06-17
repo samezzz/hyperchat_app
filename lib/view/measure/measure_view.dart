@@ -58,6 +58,7 @@ class _MeasureViewState extends State<MeasureView>
   int _totalPausedMilliseconds = 0;
   DateTime? _measurementStartTime;
   DateTime? _lastPauseTime;
+  String _selectedContext = "At rest"; // Add context selection
 
   @override
   void initState() {
@@ -359,8 +360,9 @@ class _MeasureViewState extends State<MeasureView>
       setState(() {
         isMeasuring = false;
         // Only show results if we have a valid BPM and completed the measurement
-        _showResults = _estimatedBPM > 0 && _elapsedSeconds >= _measurementDuration;
-        if (!_showResults) {
+        if (_estimatedBPM > 0 && _elapsedSeconds >= _measurementDuration) {
+          _navigateToResults();
+        } else {
           // If measurement was invalid, reset and show error
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -592,6 +594,7 @@ class _MeasureViewState extends State<MeasureView>
         child: _showResults
             ? MeasureResultView(
                 estimatedBPM: _estimatedBPM, // Pass the estimated BPM
+                initialContext: _selectedContext, // Pass the selected context
                 onSave:
                     _resetMeasurement, // Pass the reset function as the save callback
               )
@@ -613,17 +616,22 @@ class _MeasureViewState extends State<MeasureView>
         ),
         // Camera preview in circle
         if (_cameraController != null && _cameraController!.value.isInitialized)
-          Center(
-            child: Container(
-              width: 130, // Fixed width for the circle
-              height: 130, // Fixed height for the circle
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: TColor.primaryColor1, width: 2),
-              ),
-              child: ClipOval(
-                child: AspectRatio(
-                  aspectRatio: _cameraController!.value.aspectRatio,
+          Positioned(
+            top: 200, // Increased from 40 to 80 to move it higher
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                width: 150,
+                height: 150,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: TColor.primaryColor1,
+                    width: 2,
+                  ),
+                ),
+                child: ClipOval(
                   child: CameraPreview(_cameraController!),
                 ),
               ),
@@ -638,14 +646,91 @@ class _MeasureViewState extends State<MeasureView>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const SizedBox(height: 220), // Space for the camera preview
-              // Instruction text
-              Text(
-                'Place your finger on the camera to start measurement',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: TColor.textColor,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
+              // Context Selection
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: [
+                    Text(
+                      'Select Measurement Context',
+                      style: TextStyle(
+                        color: TColor.textColor,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'This helps in providing more accurate readings',
+                      style: TextStyle(
+                        color: TColor.subTextColor,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 15),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark 
+                            ? TColor.darkSurface 
+                            : TColor.white,
+                        border: Border.all(
+                          color: TColor.subTextColor.withAlpha(77),
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            isExpanded: true,
+                            value: _selectedContext,
+                            items: const [
+                              "After exercise",
+                              "At rest",
+                              "After medication",
+                              "Before sleep",
+                            ].map((String value) {
+                              return DropdownMenuItem<String>(
+                                value: value,
+                                child: Text(
+                                  value,
+                                  style: TextStyle(
+                                    color: TColor.textColor,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (String? value) {
+                              if (value != null) {
+                                setState(() {
+                                  _selectedContext = value;
+                                });
+                              }
+                            },
+                            style: TextStyle(
+                              color: TColor.textColor,
+                            ),
+                            icon: Icon(
+                              Icons.arrow_drop_down,
+                              color: TColor.textColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // Instruction text
+                    Text(
+                      'Place your finger on the camera to start measurement',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: TColor.textColor,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -715,5 +800,14 @@ class _MeasureViewState extends State<MeasureView>
         ],
       ),
     );
+  }
+
+  void _navigateToResults() {
+    if (mounted) {
+      setState(() {
+        _showResults = true;
+        isMeasuring = false;
+      });
+    }
   }
 }

@@ -5,16 +5,21 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 class MeasureResultView extends StatefulWidget {
   final int estimatedBPM;
+  final String initialContext;
   final VoidCallback onSave;
 
-  const MeasureResultView({Key? key, required this.estimatedBPM, required this.onSave}) : super(key: key);
+  const MeasureResultView({
+    Key? key, 
+    required this.estimatedBPM, 
+    required this.initialContext,
+    required this.onSave
+  }) : super(key: key);
 
   @override
   State<MeasureResultView> createState() => _MeasureResultViewState();
 }
 
 class _MeasureResultViewState extends State<MeasureResultView> {
-  String _selectedContext = "At rest";
   final MeasurementService _measurementService = MeasurementService();
   bool _isSaving = false;
   // Initialize with default values
@@ -28,7 +33,6 @@ class _MeasureResultViewState extends State<MeasureResultView> {
   }
 
   // Blood pressure estimation based on heart rate and context
-  // This is an improved model but still should not be used for medical purposes
   Map<String, int> _estimateBloodPressure(int heartRate) {
     // Base values adjusted for age and gender (assuming average adult)
     const int baseSystolic = 115;
@@ -36,7 +40,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
     
     // Get the context factor
     double contextFactor = 1.0;
-    switch (_selectedContext) {
+    switch (widget.initialContext) {
       case "After exercise":
         contextFactor = 1.15; // Higher BP expected after exercise
         break;
@@ -119,7 +123,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
         heartRate: widget.estimatedBPM,
         systolicBP: _calculatedBP['systolic']!,
         diastolicBP: _calculatedBP['diastolic']!,
-        context: _selectedContext,
+        context: widget.initialContext,
       );
 
       if (mounted) {
@@ -174,7 +178,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
           ),
         );
       }
-    
+    } finally {
       if (mounted) {
         setState(() {
           _isSaving = false;
@@ -219,15 +223,15 @@ class _MeasureResultViewState extends State<MeasureResultView> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                     Text(
-                      "${widget.estimatedBPM}", // Display the calculated BPM
+                    Text(
+                      widget.estimatedBPM.toString(),
                       style: TextStyle(
                         color: TColor.primaryColor1,
                         fontSize: 48,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                     Text(
+                    Text(
                       "bpm",
                       style: TextStyle(
                         color: TColor.subTextColor,
@@ -253,7 +257,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    "${_calculatedBP['systolic']}",
+                    _calculatedBP['systolic'].toString(),
                     style: TextStyle(
                       color: TColor.primaryColor1,
                       fontSize: 48,
@@ -269,7 +273,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
                     ),
                   ),
                   Text(
-                    "${_calculatedBP['diastolic']}",
+                    _calculatedBP['diastolic'].toString(),
                     style: TextStyle(
                       color: TColor.primaryColor1,
                       fontSize: 48,
@@ -314,55 +318,6 @@ class _MeasureResultViewState extends State<MeasureResultView> {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
-
-              // Context Dropdown
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 15),
-                decoration: BoxDecoration(
-                  color: isDarkMode ? TColor.darkSurface : TColor.white,
-                  border: Border.all(
-                    color: TColor.subTextColor.withAlpha(77),
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    isExpanded: true,
-                    value: _selectedContext,
-                    items: const [
-                      "After exercise",
-                      "At rest",
-                      "After medication",
-                      "Before sleep",
-                    ].map((String value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(
-                          value,
-                          style: TextStyle(
-                            color: TColor.textColor,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (String? value) {
-                      if (value != null) {
-                        setState(() {
-                          _selectedContext = value;
-                        });
-                      }
-                    },
-                    style: TextStyle(
-                      color: TColor.textColor,
-                    ),
-                    icon: Icon(
-                      Icons.arrow_drop_down,
-                      color: TColor.textColor,
-                    ),
-                  ),
-                ),
-              ),
               const SizedBox(height: 30),
 
               // Save Button
@@ -371,29 +326,22 @@ class _MeasureResultViewState extends State<MeasureResultView> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: TColor.primaryColor1,
                   foregroundColor: TColor.white,
-                  minimumSize: const Size(double.infinity, 50),
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                 ),
                 child: _isSaving
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
+                    ? const CircularProgressIndicator(color: Colors.white)
                     : const Text(
-                        "Save Measurement",
+                        'Save Measurement',
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 18,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
               ),
-              const SizedBox(height: 20), // Add some space at the bottom
+              const SizedBox(height: 20),
             ],
           ),
         ),
