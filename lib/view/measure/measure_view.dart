@@ -28,48 +28,66 @@ class MeasureView extends StatefulWidget {
 }
 
 class _MeasureViewState extends State<MeasureView>
-    with SingleTickerProviderStateMixin {
-  bool isMeasuring = false;
-  double measurementProgress = 0.0;
+    with TickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  late AnimationController _cameraSizeController;
+  late Animation<double> _cameraSizeAnimation;
   CameraController? _cameraController;
   bool _isCameraInitialized = false;
-  bool _isFlashlightOn = false;
+  bool isMeasuring = false;
   bool _showResults = false;
-  int _estimatedBPM = 0; // To store the calculated heart rate
+  bool _isPaused = false;
+  int _elapsedSeconds = 0;
+  int _estimatedBPM = 0;
+  double measurementProgress = 0.0;
+  final int _measurementDuration = 30; // 30 seconds measurement
+  DateTime? _measurementStartTime;
+  Timer? _measurementTimer;
+  Isolate? _processingIsolate;
+  SendPort? _sendPort;
+  ReceivePort? _receivePort;
+  int _totalPausedMilliseconds = 0;
+  DateTime? _lastPauseTime;
+  String _selectedContext = "At rest";
+  bool _isFlashlightOn = false;
   bool _isFingerDetected = false;
   Timer? _fingerDetectionTimer;
   static const int _fingerDetectionThreshold =
       5; // Number of consecutive detections needed
   int _consecutiveDetections = 0;
 
-  // Isolate related variables
-  Isolate? _processingIsolate;
-  ReceivePort? _receivePort;
-  SendPort? _sendPort;
-
-  // Timer for measurement duration and progress
-  Timer? _measurementTimer;
-  static const int _measurementDuration = 15; // Measurement duration in seconds
-  int _elapsedSeconds = 0;
-
-  bool _isPaused = false;  // Track pause state
-  int _totalPausedMilliseconds = 0;
-  DateTime? _measurementStartTime;
-  DateTime? _lastPauseTime;
-  String _selectedContext = "At rest"; // Add context selection
+  late AnimationController _heartController;
+  late Animation<double> _heartAnimation;
 
   @override
   void initState() {
     super.initState();
+    
+    // Initialize pulse animation
     _pulseController = AnimationController(
-      duration: const Duration(seconds: 1),
+      duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat(reverse: true);
-
-    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    // Initialize camera size animation
+    _cameraSizeController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _cameraSizeAnimation = Tween<double>(begin: 150.0, end: 100.0).animate(
+      CurvedAnimation(parent: _cameraSizeController, curve: Curves.easeInOut),
+    );
+
+    _heartController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat(reverse: true);
+    _heartAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
+      CurvedAnimation(parent: _heartController, curve: Curves.easeInOut),
     );
 
     _initializeCamera();
@@ -226,6 +244,8 @@ class _MeasureViewState extends State<MeasureView>
 
     // Start the measurement timer for progress and completion
     _startMeasurementTimer();
+
+    _cameraSizeController.forward();
   }
 
   void _startImageStream() {
@@ -555,6 +575,7 @@ class _MeasureViewState extends State<MeasureView>
         _lastPauseTime = null;
         _isPaused = false;
       });
+      _cameraSizeController.reverse();
     }
 
     await _toggleFlashlight(false);
@@ -572,6 +593,8 @@ class _MeasureViewState extends State<MeasureView>
   @override
   void dispose() {
     _pulseController.dispose();
+    _heartController.dispose();
+    _cameraSizeController.dispose();
     if (_cameraController != null) {
       _cameraController!.stopImageStream();
       _cameraController!.dispose();
@@ -617,23 +640,28 @@ class _MeasureViewState extends State<MeasureView>
         // Camera preview in circle
         if (_cameraController != null && _cameraController!.value.isInitialized)
           Positioned(
-            top: 200, // Increased from 40 to 80 to move it higher
+            top: 200,
             left: 0,
             right: 0,
             child: Center(
-              child: Container(
-                width: 150,
-                height: 150,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: TColor.primaryColor1,
-                    width: 2,
-                  ),
-                ),
-                child: ClipOval(
-                  child: CameraPreview(_cameraController!),
-                ),
+              child: AnimatedBuilder(
+                animation: _cameraSizeAnimation,
+                builder: (context, child) {
+                  return Container(
+                    width: _cameraSizeAnimation.value,
+                    height: _cameraSizeAnimation.value,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: TColor.primaryColor1,
+                        width: 2,
+                      ),
+                    ),
+                    child: ClipOval(
+                      child: CameraPreview(_cameraController!),
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -788,19 +816,24 @@ class _MeasureViewState extends State<MeasureView>
         children: [
           // Camera preview in circle
           if (_cameraController != null && _cameraController!.value.isInitialized)
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: TColor.primaryColor1,
-                  width: 2,
-                ),
-              ),
-              child: ClipOval(
-                child: CameraPreview(_cameraController!),
-              ),
+            AnimatedBuilder(
+              animation: _cameraSizeAnimation,
+              builder: (context, child) {
+                return Container(
+                  width: _cameraSizeAnimation.value,
+                  height: _cameraSizeAnimation.value,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: TColor.primaryColor1,
+                      width: 2,
+                    ),
+                  ),
+                  child: ClipOval(
+                    child: CameraPreview(_cameraController!),
+                  ),
+                );
+              },
             ),
           const SizedBox(height: 40),
           // Estimated BPM display
