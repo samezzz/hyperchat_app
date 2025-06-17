@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../common/colo_extension.dart';
 import '../../services/measurement_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import '../../providers/user_provider.dart';
 
 class MeasureResultView extends StatefulWidget {
   final int estimatedBPM;
@@ -118,12 +120,18 @@ class _MeasureResultViewState extends State<MeasureResultView> {
         throw Exception('User not logged in');
       }
       
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      if (userProvider.user == null) {
+        throw Exception('User data not loaded');
+      }
+      
       await _measurementService.addMeasurement(
         userId: user.uid,
         heartRate: widget.estimatedBPM,
         systolicBP: _calculatedBP['systolic']!,
         diastolicBP: _calculatedBP['diastolic']!,
         context: widget.initialContext,
+        healthBackground: userProvider.user!.healthBackground,
       );
 
       if (mounted) {
@@ -318,6 +326,83 @@ class _MeasureResultViewState extends State<MeasureResultView> {
                   ],
                 ),
               ),
+              const SizedBox(height: 20),
+
+              // AI Analysis Section
+              FutureBuilder<Map<String, dynamic>>(
+                future: _measurementService.geminiService.analyzeMeasurement(
+                  systolicBP: _calculatedBP['systolic']!,
+                  diastolicBP: _calculatedBP['diastolic']!,
+                  heartRate: widget.estimatedBPM,
+                  context: widget.initialContext,
+                  healthBackground: Provider.of<UserProvider>(context, listen: false).user!.healthBackground,
+                ),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  
+                  if (snapshot.hasError) {
+                    return Container(
+                      padding: const EdgeInsets.all(15),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withAlpha(26),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        'Unable to analyze measurement: ${snapshot.error}',
+                        style: TextStyle(color: Colors.red[700]),
+                      ),
+                    );
+                  }
+
+                  final analysis = snapshot.data!;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "AI Analysis",
+                        style: TextStyle(
+                          color: TColor.textColor,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      // Interpretation
+                      _buildAnalysisCard(
+                        "Interpretation",
+                        analysis['interpretation'] ?? 'No interpretation available',
+                        Icons.analytics_outlined,
+                      ),
+                      const SizedBox(height: 10),
+                      // Concerns
+                      if ((analysis['concerns'] as List?)?.isNotEmpty ?? false)
+                        _buildAnalysisCard(
+                          "Concerns",
+                          (analysis['concerns'] as List).join('\n• '),
+                          Icons.warning_amber_rounded,
+                          isWarning: true,
+                        ),
+                      const SizedBox(height: 10),
+                      // Recommendations
+                      if ((analysis['recommendations'] as List?)?.isNotEmpty ?? false)
+                        _buildAnalysisCard(
+                          "Recommendations",
+                          (analysis['recommendations'] as List).join('\n• '),
+                          Icons.lightbulb_outline,
+                        ),
+                      const SizedBox(height: 10),
+                      // Measurement Quality
+                      _buildAnalysisCard(
+                        "Measurement Quality",
+                        analysis['measurementQuality'] ?? 'Unknown',
+                        Icons.check_circle_outline,
+                      ),
+                    ],
+                  );
+                },
+              ),
               const SizedBox(height: 30),
 
               // Save Button
@@ -345,6 +430,48 @@ class _MeasureResultViewState extends State<MeasureResultView> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildAnalysisCard(String title, String content, IconData icon, {bool isWarning = false}) {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: isWarning 
+            ? Colors.orange.withAlpha(26)
+            : TColor.primaryColor1.withAlpha(26),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                icon,
+                color: isWarning ? Colors.orange : TColor.primaryColor1,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: TextStyle(
+                  color: isWarning ? Colors.orange[700] : TColor.primaryColor1,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            content,
+            style: TextStyle(
+              color: isWarning ? Colors.orange[700] : TColor.textColor,
+              fontSize: 14,
+            ),
+          ),
+        ],
       ),
     );
   }

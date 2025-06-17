@@ -1,5 +1,7 @@
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../config/api_config.dart';
+import 'dart:convert';
+import '../models/user_model.dart';
 
 class GeminiService {
   late final GenerativeModel _model;
@@ -62,5 +64,64 @@ class GeminiService {
         Content.text('You are HyperBot, a helpful AI assistant focused on hypertension and blood pressure management. Provide clear, accurate, and supportive responses to user questions about health, blood pressure, and related topics.'),
       ],
     );
+  }
+
+  Future<Map<String, dynamic>> analyzeMeasurement({
+    required int systolicBP,
+    required int diastolicBP,
+    required int heartRate,
+    required String context,
+    required HealthBackground healthBackground,
+  }) async {
+    try {
+      final prompt = '''
+Analyze the following blood pressure measurement and provide insights:
+- Systolic BP: $systolicBP mmHg
+- Diastolic BP: $diastolicBP mmHg
+- Heart Rate: $heartRate bpm
+- Context: $context
+
+Patient Background:
+- Has Hypertension: ${healthBackground.hasHypertension}
+- Medications: ${healthBackground.medications.join(', ')}
+- Activity Level: ${healthBackground.activityLevel}
+- Smoking Habits: ${healthBackground.smokingHabits}
+- Drinking Habits: ${healthBackground.drinkingHabits}
+
+Please provide:
+1. A brief interpretation of the readings
+2. Any potential concerns or anomalies
+3. Recommendations for next steps
+4. Whether the measurement conditions seem appropriate
+
+Format the response as a JSON object with the following structure:
+{
+  "interpretation": "string",
+  "concerns": ["string"],
+  "recommendations": ["string"],
+  "measurementQuality": "string"
+}
+''';
+
+      final response = await _model.generateContent([Content.text(prompt)]);
+      final responseText = response.text ?? '{}';
+      
+      // Clean the response by removing markdown code blocks and any extra whitespace
+      String cleanResponse = responseText
+          .replaceAll('```json', '')
+          .replaceAll('```', '')
+          .trim();
+      
+      // Parse the response as JSON
+      return json.decode(cleanResponse);
+    } catch (e) {
+      print('Measurement Analysis Error: $e');
+      return {
+        'interpretation': 'Unable to analyze measurement at this time.',
+        'concerns': [],
+        'recommendations': ['Please try again later.'],
+        'measurementQuality': 'Unknown'
+      };
+    }
   }
 } 

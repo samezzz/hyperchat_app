@@ -8,6 +8,7 @@ class Measurement {
   final int systolicBP;
   final int diastolicBP;
   final String context;
+  final Map<String, dynamic> aiAnalysis;
 
   Measurement({
     required this.id,
@@ -17,6 +18,7 @@ class Measurement {
     required this.systolicBP,
     required this.diastolicBP,
     required this.context,
+    required this.aiAnalysis,
   });
 
   // Create a Measurement from a Firestore document
@@ -29,7 +31,8 @@ class Measurement {
       heartRate: data['heartRate'] ?? 0,
       systolicBP: data['systolicBP'] ?? 0,
       diastolicBP: data['diastolicBP'] ?? 0,
-      context: data['context'] ?? 'At rest',
+      context: data['context'] ?? '',
+      aiAnalysis: data['aiAnalysis'] ?? {},
     );
   }
 
@@ -42,6 +45,7 @@ class Measurement {
       'systolicBP': systolicBP,
       'diastolicBP': diastolicBP,
       'context': context,
+      'aiAnalysis': aiAnalysis,
     };
   }
 } 

@@ -1,9 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../model/measurement.dart';
+import 'gemini_service.dart';
+import '../models/user_model.dart';
 
 class MeasurementService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String _collection = 'measurements';
+  final GeminiService geminiService = GeminiService();
 
   // Add a new measurement
   Future<String> addMeasurement({
@@ -12,8 +15,19 @@ class MeasurementService {
     required int systolicBP,
     required int diastolicBP,
     required String context,
+    required HealthBackground healthBackground,
   }) async {
     try {
+      // Get AI analysis of the measurement
+      final analysis = await geminiService.analyzeMeasurement(
+        systolicBP: systolicBP,
+        diastolicBP: diastolicBP,
+        heartRate: heartRate,
+        context: context,
+        healthBackground: healthBackground,
+      );
+
+      // Add measurement with AI analysis
       DocumentReference docRef = await _firestore.collection(_collection).add({
         'userId': userId,
         'timestamp': FieldValue.serverTimestamp(),
@@ -21,6 +35,7 @@ class MeasurementService {
         'systolicBP': systolicBP,
         'diastolicBP': diastolicBP,
         'context': context,
+        'aiAnalysis': analysis,
       });
       return docRef.id;
     } catch (e) {
