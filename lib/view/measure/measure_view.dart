@@ -190,7 +190,10 @@ class _MeasureViewState extends State<MeasureView>
 
       // Finger detection logic
       // When finger covers camera, brightness drops significantly
-      bool isFingerPresent = avgBrightness < 50; // Adjust threshold as needed
+      // On mobile with flashlight, covered camera is still bright, so use a higher threshold
+      // Typical values: Laptop (dark): < 50, Mobile (with flash, covered): ~80-120
+      // You may need to tune this value for your device. Try 120 as a starting point.
+      bool isFingerPresent = avgBrightness < 120;
 
       if (isFingerPresent) {
         _consecutiveDetections++;
@@ -262,7 +265,10 @@ class _MeasureViewState extends State<MeasureView>
           }
 
           // Check if finger is still present
-          bool isFingerPresent = avgBrightness < 50;
+          // On mobile with flashlight, covered camera is still bright, so use a higher threshold
+          // Typical values: Laptop (dark): < 50, Mobile (with flash, covered): ~80-120
+          // You may need to tune this value for your device. Try 120 as a starting point.
+          bool isFingerPresent = avgBrightness < 120;
 
           if (!isFingerPresent && !_isPaused) {
             // Finger removed, pause measurement

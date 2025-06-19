@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../common/colo_extension.dart';
 import '../main_tab/main_tab_view.dart';
 import '../../models/user_model.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class OnboardingView extends StatefulWidget {
   const OnboardingView({super.key});
@@ -200,6 +201,10 @@ class _OnboardingViewState extends State<OnboardingView> {
           .collection('users')
           .doc(user.uid)
           .set(userModel.toMap());
+
+      // Set onboarding completion flag
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('hasCompletedOnboarding', true);
 
       // Navigate to main tab view
       if (mounted) {
