@@ -399,6 +399,7 @@ class _MeasureViewState extends State<MeasureView>
         isMeasuring = false;
         // Only show results if we have a valid BPM and completed the measurement
         if (_estimatedBPM > 0 && _elapsedSeconds >= _measurementDuration) {
+          _toggleFlashlight(false); // Turn off flashlight immediately when measurement is complete
           _navigateToResults();
         } else {
           // If measurement was invalid, reset and show error
