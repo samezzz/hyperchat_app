@@ -6,11 +6,11 @@ plugins {
     id("com.google.gms.google-services")
 }
 
-def keystoreProperties = new Properties()
-def keystorePropertiesFile = rootProject.file('key.properties')
-if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
-}
+// def keystoreProperties = new Properties()
+// def keystorePropertiesFile = rootProject.file('key.properties')
+// if (keystorePropertiesFile.exists()) {
+//     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+//}
 
 android {
     namespace = "com.samess.hyperchat_app"
@@ -36,14 +36,14 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    signingConfigs {
-        create("release") {
-            keyAlias = keystoreProperties['keyAlias']
-            keyPassword = keystoreProperties['keyPassword']
-            storeFile = file(keystoreProperties['storeFile'])
-            storePassword = keystoreProperties['storePassword']
-        }
-    }
+    // signingConfigs {
+    //    create("release") {
+    //        keyAlias = keystoreProperties['keyAlias']
+    //        keyPassword = keystoreProperties['keyPassword']
+    //        storeFile = file(keystoreProperties['storeFile'])
+    //        storePassword = keystoreProperties['storePassword']
+    //    }
+    //}
 
     buildTypes {
         release {
