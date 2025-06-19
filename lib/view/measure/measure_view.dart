@@ -28,7 +28,7 @@ class MeasureView extends StatefulWidget {
 }
 
 class _MeasureViewState extends State<MeasureView>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   late AnimationController _cameraSizeController;
@@ -63,6 +63,7 @@ class _MeasureViewState extends State<MeasureView>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     
     // Initialize pulse animation
     _pulseController = AnimationController(
@@ -91,6 +92,17 @@ class _MeasureViewState extends State<MeasureView>
     );
 
     _initializeCamera();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      // Always turn off flashlight when app is not in foreground
+      _toggleFlashlight(false);
+    }
   }
 
   Future<void> _initializeCamera() async {
@@ -598,6 +610,7 @@ class _MeasureViewState extends State<MeasureView>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pulseController.dispose();
     _heartController.dispose();
     _cameraSizeController.dispose();
@@ -609,6 +622,7 @@ class _MeasureViewState extends State<MeasureView>
     _receivePort?.close();
     _measurementTimer?.cancel();
     WakelockPlus.disable();
+    _toggleFlashlight(false);
     super.dispose();
   }
 
