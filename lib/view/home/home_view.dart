@@ -13,6 +13,7 @@ import '../../services/learning_service.dart';
 import '../../model/learning_path.dart';
 import '../learning/learning_path_view.dart';
 import '../dialogs/set_reminder_dialog.dart';
+import '../measure/measure_view.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -756,7 +757,11 @@ class _HomeViewState extends State<HomeView>
                               child: Center(
                                 child: IconButton(
                                   onPressed: () {
-                                    // TODO: Navigate to measure view
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (context) => const MeasureView(),
+                                      ),
+                                    );
                                   },
                                   icon: Icon(
                                     Icons.favorite,

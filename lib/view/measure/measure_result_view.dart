@@ -327,6 +327,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
                   ),
                 ],
               ),
+
               const SizedBox(height: 30),
 
               // Feedback/Interpretation
@@ -355,6 +356,30 @@ class _MeasureResultViewState extends State<MeasureResultView> {
                   ],
                 ),
               ),
+
+                            // Add disclaimer below BP values
+              const SizedBox(height: 10),
+              Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.orangeAccent.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 22),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Disclaimer: The blood pressure values shown are estimates and are not intended for medical diagnosis or treatment. For accurate blood pressure readings, use a clinically validated BP cuff.',
+                        style: TextStyle(color: Colors.orange[900], fontSize: 14, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
               const SizedBox(height: 20),
 
               // AI Analysis Section
