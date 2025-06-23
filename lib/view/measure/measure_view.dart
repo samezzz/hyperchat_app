@@ -779,6 +779,15 @@ class _MeasureViewState extends State<MeasureView>
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Keep your finger flat and steady on the camera and flash for best results.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: TColor.subTextColor,
+                        fontSize: 14,
+                      ),
+                    ),
                   ],
                 ),
               ),
