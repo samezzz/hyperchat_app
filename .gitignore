@@ -46,3 +46,4 @@ app.*.map.json
 
 /implementation_from_other_projects/
 /lib/config/api_config.dart
+serviceAccountKey.json
