@@ -925,7 +925,7 @@ class _MeasureViewState extends State<MeasureView>
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  'Calibrated! Brightness: \\${_fingerDetectionThresholdValue.toStringAsFixed(1)}, Redness: \\${_rednessThreshold.toStringAsFixed(1)}',
+                                  'Calibrated! Brightness: ${_fingerDetectionThresholdValue.toStringAsFixed(1)}, Redness: ${_rednessThreshold.toStringAsFixed(1)}',
                                 ),
                                 duration: const Duration(seconds: 2),
                               ),
@@ -968,7 +968,7 @@ class _MeasureViewState extends State<MeasureView>
                             },
                           ),
                           Text(
-                            'Current: \\${_fingerDetectionThresholdValue.round()}',
+                            'Current: ${_fingerDetectionThresholdValue.round()}',
                             style: TextStyle(
                               color: TColor.subTextColor,
                               fontSize: 12,
@@ -996,7 +996,7 @@ class _MeasureViewState extends State<MeasureView>
                             },
                           ),
                           Text(
-                            'Current: \\${_rednessThreshold.round()}',
+                            'Current: ${_rednessThreshold.round()}',
                             style: TextStyle(
                               color: TColor.subTextColor,
                               fontSize: 12,
@@ -1036,28 +1036,28 @@ class _MeasureViewState extends State<MeasureView>
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  'Brightness: \\${_lastAvgBrightness?.toStringAsFixed(1) ?? "---"}',
+                                  'Brightness: ${_lastAvgBrightness?.toStringAsFixed(1) ?? "---"}',
                                   style: TextStyle(
                                     color: TColor.subTextColor,
                                     fontSize: 11,
                                   ),
                                 ),
                                 Text(
-                                  'Redness: \\${_lastAvgRedness?.toStringAsFixed(1) ?? "---"}',
+                                  'Redness: ${_lastAvgRedness?.toStringAsFixed(1) ?? "---"}',
                                   style: TextStyle(
                                     color: TColor.subTextColor,
                                     fontSize: 11,
                                   ),
                                 ),
                                 Text(
-                                  'Flashlight: \\${_isFlashlightOn ? "ON" : "OFF"}',
+                                  'Flashlight: ${_isFlashlightOn ? "ON" : "OFF"}',
                                   style: TextStyle(
                                     color: TColor.subTextColor,
                                     fontSize: 11,
                                   ),
                                 ),
                                 Text(
-                                  'Consecutive Detections: \\$_consecutiveDetections',
+                                  'Consecutive Detections: $_consecutiveDetections',
                                   style: TextStyle(
                                     color: TColor.subTextColor,
                                     fontSize: 11,
@@ -1065,7 +1065,7 @@ class _MeasureViewState extends State<MeasureView>
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Detection Status: \\${_isFlashlightOn && _lastAvgBrightness != null && _lastAvgRedness != null ? (_lastAvgBrightness! < _fingerDetectionThresholdValue && _lastAvgRedness! > _rednessThreshold ? "FINGER DETECTED" : "NO FINGER") : "CHECKING..."}',
+                                  'Detection Status: ${_isFlashlightOn && _lastAvgBrightness != null && _lastAvgRedness != null ? (_lastAvgBrightness! < _fingerDetectionThresholdValue && _lastAvgRedness! > _rednessThreshold ? "FINGER DETECTED" : "NO FINGER") : "CHECKING..."}',
                                   style: TextStyle(
                                     color: _isFlashlightOn && _lastAvgBrightness != null && _lastAvgRedness != null
                                         ? (_lastAvgBrightness! < _fingerDetectionThresholdValue && _lastAvgRedness! > _rednessThreshold
