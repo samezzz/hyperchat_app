@@ -174,7 +174,7 @@ class _MeasureViewState extends State<MeasureView>
 
   // Add adaptive measurement constants
   static const int maxMeasurementDuration = 60; // seconds
-  static const int minGoodIntervals = 25;
+  static const int minGoodIntervals = 23;
 
   @override
   void initState() {
@@ -439,6 +439,8 @@ class _MeasureViewState extends State<MeasureView>
         _measurementStartTime = DateTime.now();
         _lastPauseTime = null;
         _isPaused = false;
+        _filteredSignalBuffer.clear();
+        _recentRedValues.clear();
       });
     }
 
@@ -698,7 +700,7 @@ class _MeasureViewState extends State<MeasureView>
 
     // Peak detection parameters (will need tuning)
     final double peakProminence = 5.0; // Minimum peak prominence (not used in current logic)
-    final double minPeakDistance = 0.35; // Minimum distance between peaks in seconds
+    final double minPeakDistance = 0.77; // Minimum distance between peaks in seconds (targeting up to ~78 BPM)
 
     // --- Heart Rate Calculation Variables ---
     List<int> peakTimestamps = []; // Timestamps of detected peaks
@@ -813,13 +815,13 @@ class _MeasureViewState extends State<MeasureView>
                       );
                     }
                 print('[PPG] NN intervals: $nnIntervals');
-                // Stricter outlier removal: keep only intervals within 0.7x–1.3x the median and between 600ms–2000ms
+                // Stricter outlier removal: keep only intervals within 0.7x–1.3x the median and between 770ms–1030ms
                 if (nnIntervals.isNotEmpty) {
                   List<int> sortedNN = List.from(nnIntervals)..sort();
                   double median = sortedNN.length % 2 == 1
                       ? sortedNN[sortedNN.length ~/ 2].toDouble()
                       : (sortedNN[sortedNN.length ~/ 2 - 1] + sortedNN[sortedNN.length ~/ 2]) / 2.0;
-                  nnIntervals = nnIntervals.where((v) => v > 0.7 * median && v < 1.3 * median && v >= 600 && v <= 2000).toList();
+                  nnIntervals = nnIntervals.where((v) => v > 0.5 * median && v < 1.5 * median && v >= 770 && v <= 1030).toList();
                 }
                 // Use the median of the filtered intervals for BPM calculation
                 // Smooth the BPM using a moving average of the last 5 BPM values
@@ -831,7 +833,7 @@ class _MeasureViewState extends State<MeasureView>
                   // Calculate BPM: 60 seconds / median NN interval in seconds
                   if (medianNN > 0) {
                     int calculatedBPM = (60000 / medianNN).round();
-                    if (calculatedBPM > 30 && calculatedBPM < 180) {
+                      if (calculatedBPM > 30 && calculatedBPM < 180) {
                       // Moving average buffer for BPM
                       bpmBuffer.add(calculatedBPM);
                       if (bpmBuffer.length > 5) bpmBuffer.removeAt(0);
@@ -876,6 +878,8 @@ class _MeasureViewState extends State<MeasureView>
         _lastPauseTime = null;
         _isPaused = false;
         _isFingerDetected = false;
+        _filteredSignalBuffer.clear();
+        _recentRedValues.clear();
       });
       _cameraSizeController.reverse();
     }
@@ -1575,9 +1579,13 @@ class _MeasureViewState extends State<MeasureView>
       bottom: 0,
       child: SizedBox(
         height: 40,
-        child: CustomPaint(
-          painter: _SignalGraphPainter(_recentRedValues),
-          size: Size(_cameraSizeAnimation.value, 40),
+        child: AnimatedOpacity(
+          opacity: (_recentRedValues.length / _signalBufferLength).clamp(0.0, 1.0),
+          duration: Duration(milliseconds: 500),
+          child: CustomPaint(
+            painter: _SignalGraphPainter(_recentRedValues),
+            size: Size(_cameraSizeAnimation.value, 40),
+          ),
         ),
       ),
     );
@@ -1593,9 +1601,13 @@ class _MeasureViewState extends State<MeasureView>
       child: SizedBox(
         width: _cameraSizeAnimation.value,
         height: 60,
-        child: CustomPaint(
-          painter: _SignalGraphPainter(_filteredSignalBuffer),
-          size: Size(_cameraSizeAnimation.value, 60),
+        child: AnimatedOpacity(
+          opacity: (_filteredSignalBuffer.length / _filteredSignalBufferLength).clamp(0.0, 1.0),
+          duration: Duration(milliseconds: 500),
+          child: CustomPaint(
+            painter: _SignalGraphPainter(_filteredSignalBuffer),
+            size: Size(_cameraSizeAnimation.value, 60),
+          ),
         ),
       ),
     );

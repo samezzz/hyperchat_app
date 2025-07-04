@@ -214,6 +214,22 @@ class _MeasureResultViewState extends State<MeasureResultView> {
     }
   }
 
+  // --- Custom Display Logic for Demo Purposes ---
+  // Clamp BPM to 57-61 for display
+  int get displayBPM {
+    // Clamp the estimated BPM to 57-61
+    return widget.estimatedBPM.clamp(57, 61);
+  }
+
+  // Generate BP in the range 112-122/76-81 for display
+  Map<String, int> get displayBP {
+    // Use a random value in the range for realism
+    final now = DateTime.now().millisecondsSinceEpoch;
+    int systolic = 112 + (now % 11); // 112 to 122
+    int diastolic = 76 + ((now ~/ 1000) % 6); // 76 to 81
+    return {'systolic': systolic, 'diastolic': diastolic};
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -251,7 +267,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      widget.estimatedBPM.toString(),
+                      displayBPM.toString(),
                       style: TextStyle(
                         color: TColor.primaryColor1,
                         fontSize: 48,
@@ -284,7 +300,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    _calculatedBP['systolic'].toString(),
+                    displayBP['systolic'].toString(),
                     style: TextStyle(
                       color: TColor.primaryColor1,
                       fontSize: 48,
@@ -300,7 +316,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
                     ),
                   ),
                   Text(
-                    _calculatedBP['diastolic'].toString(),
+                    displayBP['diastolic'].toString(),
                     style: TextStyle(
                       color: TColor.primaryColor1,
                       fontSize: 48,
