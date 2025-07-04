@@ -205,6 +205,10 @@ class _OnboardingViewState extends State<OnboardingView> {
       // Set onboarding completion flag
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('hasCompletedOnboarding', true);
+      // Also set onboarding completion in Firestore
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'hasCompletedOnboarding': true,
+      }, SetOptions(merge: true));
 
       // Navigate to main tab view
       if (mounted) {

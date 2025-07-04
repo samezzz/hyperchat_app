@@ -13,11 +13,17 @@ import 'package:hyperchat_app/view/main_tab/main_tab_view.dart';
 import 'package:hyperchat_app/view/profile/profile_view.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   
+  // Initialize App Check for development
+  await FirebaseAppCheck.instance.activate(
+    androidProvider: AndroidProvider.debug, // Use playIntegrity for production
+  );
+
   // Initialize notification service
   final notificationService = NotificationService();
   await notificationService.initialize();

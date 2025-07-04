@@ -16,7 +16,8 @@ import '../dialogs/set_reminder_dialog.dart';
 import '../measure/measure_view.dart';
 
 class HomeView extends StatefulWidget {
-  const HomeView({super.key});
+  final void Function()? onMeasureTabRequested;
+  const HomeView({super.key, this.onMeasureTabRequested});
 
   @override
   State<HomeView> createState() => _HomeViewState();
@@ -757,11 +758,9 @@ class _HomeViewState extends State<HomeView>
                               child: Center(
                                 child: IconButton(
                                   onPressed: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (context) => const MeasureView(),
-                                      ),
-                                    );
+                                    if (widget.onMeasureTabRequested != null) {
+                                      widget.onMeasureTabRequested!();
+                                    }
                                   },
                                   icon: Icon(
                                     Icons.favorite,

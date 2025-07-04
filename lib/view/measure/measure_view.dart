@@ -53,12 +53,32 @@ class _MeasureViewState extends State<MeasureView>
   bool _isFlashlightOn = false;
   bool _isFingerDetected = false;
   Timer? _fingerDetectionTimer;
-  static const int _fingerDetectionThreshold =
+  double _fingerDetectionThresholdValue = 120.0;
+  static const int _fingerDetectionConsecutive =
       5; // Number of consecutive detections needed
   int _consecutiveDetections = 0;
+  bool _fingerDetectedReadyToStart = false;
 
   late AnimationController _heartController;
   late Animation<double> _heartAnimation;
+
+  // For debug info
+  double? _lastAvgBrightness;
+  double? _lastAvgRedness;
+  double _rednessThreshold = 126.0; // Adjustable threshold for redness
+  bool _showDebugInfo = true; // Always show debug info for troubleshooting
+
+  // Debounce for measurement finger detection
+  static const int _measurementFingerDetectionConsecutive = 5;
+  int _measurementFingerMissingCount = 0;
+  int _measurementFingerPresentCount = 0;
+  bool _isMeasurementStreamRunning = false;
+
+  // For auto-calibration
+  bool _hasAutoCalibrated = false;
+  List<double> _autoCalibBrightness = [];
+  List<double> _autoCalibRedness = [];
+  bool _isFingerDetectionStreamRunning = false;
 
   @override
   void initState() {
@@ -150,8 +170,13 @@ class _MeasureViewState extends State<MeasureView>
         setState(() {
           _isCameraInitialized = true;
         });
-        // Start finger detection stream
-        _startFingerDetection();
+        // Turn on flashlight immediately after camera is initialized
+        await _toggleFlashlight(true);
+        // Auto-calibrate thresholds on first entry
+        _hasAutoCalibrated = false;
+        _autoCalibBrightness.clear();
+        _autoCalibRedness.clear();
+        _startFingerDetection(autoCalibrate: true);
       }
     } catch (e) {
       if (mounted) {
@@ -182,16 +207,30 @@ class _MeasureViewState extends State<MeasureView>
     }
   }
 
-  void _startFingerDetection() {
-    if (_cameraController == null || !_isCameraInitialized) return;
+  Future<void> _stopFingerDetectionStream() async {
+    if (_isFingerDetectionStreamRunning) {
+      try {
+        print('[Camera] Stopping finger detection stream...');
+        await _cameraController?.stopImageStream();
+      } catch (e) {
+        print('[Camera] Error stopping finger detection stream: $e');
+      }
+      _isFingerDetectionStreamRunning = false;
+    }
+  }
 
+  Future<void> _startFingerDetection({bool autoCalibrate = false}) async {
+    if (_cameraController == null || !_isCameraInitialized) return;
+    if (_isFingerDetectionStreamRunning) return;
+    _isFingerDetectionStreamRunning = true;
+    int autoCalibFrames = 0;
+    print('[Camera] Starting finger detection stream...');
+    await Future.delayed(const Duration(milliseconds: 300));
     _cameraController!.startImageStream((CameraImage image) {
       if (isMeasuring) {
-        // If we're measuring, stop the finger detection stream
-        _cameraController?.stopImageStream();
+        // Do not interfere with measurement stream
         return;
       }
-
       // Calculate average brightness from Y plane
       double avgBrightness = 0;
       if (image.planes.isNotEmpty) {
@@ -199,25 +238,79 @@ class _MeasureViewState extends State<MeasureView>
             image.planes[0].bytes.reduce((value, element) => value + element) /
             image.planes[0].bytes.length;
       }
-
-      // Finger detection logic
-      // When finger covers camera, brightness drops significantly
-      // On mobile with flashlight, covered camera is still bright, so use a higher threshold
-      // Typical values: Laptop (dark): < 50, Mobile (with flash, covered): ~80-120
-      // You may need to tune this value for your device. Try 120 as a starting point.
-      bool isFingerPresent = avgBrightness < 120;
-
+      double avgRedness = 0;
+      if (image.planes.length >= 3) {
+        avgRedness = image.planes[2].bytes.reduce((a, b) => a + b) / image.planes[2].bytes.length;
+      }
+      _lastAvgBrightness = avgBrightness;
+      _lastAvgRedness = avgRedness;
+      if (mounted) {
+        setState(() {});
+      }
+      if (!_isFlashlightOn) {
+        _consecutiveDetections = 0;
+        if (_isFingerDetected) {
+          setState(() {
+            _isFingerDetected = false;
+          });
+        }
+        return;
+      }
+      // Auto-calibration logic
+      if (autoCalibrate && !_hasAutoCalibrated) {
+        _autoCalibBrightness.add(avgBrightness);
+        _autoCalibRedness.add(avgRedness);
+        autoCalibFrames++;
+        if (autoCalibFrames >= 10) {
+          double avgB = _autoCalibBrightness.reduce((a, b) => a + b) / _autoCalibBrightness.length;
+          double avgR = _autoCalibRedness.reduce((a, b) => a + b) / _autoCalibRedness.length;
+          setState(() {
+            _fingerDetectionThresholdValue = avgB - 5;
+            _rednessThreshold = avgR + 5;
+            _hasAutoCalibrated = true;
+          });
+          // Schedule stopImageStream outside the callback
+          Future.microtask(() async {
+            try {
+              print('[Camera] Stopping finger detection stream after auto-calibration...');
+              await _cameraController?.stopImageStream();
+            } catch (e) {
+              print('[Camera] Error stopping finger detection stream after auto-calibration: $e');
+            }
+            _isFingerDetectionStreamRunning = false;
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Finger detection calibrated for your environment.'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
+            // Start normal finger detection after a delay
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (mounted && !isMeasuring) _startFingerDetection();
+            });
+          });
+        }
+        return;
+      }
+      bool isFingerPresent = avgBrightness < _fingerDetectionThresholdValue && avgRedness > _rednessThreshold;
       if (isFingerPresent) {
         _consecutiveDetections++;
-        if (_consecutiveDetections >= _fingerDetectionThreshold &&
-            !isMeasuring) {
-          _consecutiveDetections = 0;
-          // Stop the finger detection stream before starting measurement
-          _cameraController?.stopImageStream();
-          _startMeasurement();
+        if (_consecutiveDetections >= _fingerDetectionConsecutive && !isMeasuring) {
+          if (!_isFingerDetected) {
+            setState(() {
+              _isFingerDetected = true;
+            });
+          }
         }
       } else {
         _consecutiveDetections = 0;
+        if (_isFingerDetected) {
+          setState(() {
+            _isFingerDetected = false;
+          });
+        }
       }
     });
   }
@@ -234,6 +327,9 @@ class _MeasureViewState extends State<MeasureView>
 
     // Turn on flashlight automatically
     await _toggleFlashlight(true);
+
+    // Stop finger detection stream before starting measurement
+    await _stopFingerDetectionStream();
 
     if (mounted) {
       setState(() {
@@ -263,35 +359,58 @@ class _MeasureViewState extends State<MeasureView>
     _cameraSizeController.forward();
   }
 
-  void _startImageStream() {
+  Future<void> _startImageStream() async {
     if (_cameraController == null || !_isCameraInitialized) return;
-
+    if (_isMeasurementStreamRunning) return;
+    _isMeasurementStreamRunning = true;
+    print('[Camera] Starting measurement stream...');
+    await Future.delayed(const Duration(milliseconds: 300));
     try {
       _cameraController!.startImageStream((CameraImage image) {
         if (isMeasuring) {
           // Calculate average brightness from Y plane for finger detection
           double avgBrightness = 0;
           if (image.planes.isNotEmpty) {
-            avgBrightness = image.planes[0].bytes.reduce((value, element) => value + element) /
+            avgBrightness =
+                image.planes[0].bytes.reduce((value, element) => value + element) /
                 image.planes[0].bytes.length;
           }
+          double avgRedness = 0;
+          if (image.planes.length >= 3) {
+            avgRedness = image.planes[2].bytes.reduce((a, b) => a + b) / image.planes[2].bytes.length;
+          }
 
-          // Check if finger is still present
-          // On mobile with flashlight, covered camera is still bright, so use a higher threshold
-          // Typical values: Laptop (dark): < 50, Mobile (with flash, covered): ~80-120
-          // You may need to tune this value for your device. Try 120 as a starting point.
-          bool isFingerPresent = avgBrightness < 120;
+          // Use combined checks: brightness low, redness high
+          bool isFingerPresent = avgBrightness < _fingerDetectionThresholdValue && avgRedness > _rednessThreshold;
 
-          if (!isFingerPresent && !_isPaused) {
-            // Finger removed, pause measurement
+          // Debounce logic for pausing/resuming
+          if (isFingerPresent) {
+            _measurementFingerPresentCount++;
+            _measurementFingerMissingCount = 0;
+            if (_measurementFingerPresentCount >= _measurementFingerDetectionConsecutive && _isPaused) {
+              // Resume measurement
+              if (_lastPauseTime != null) {
+                final pauseDuration = DateTime.now().difference(_lastPauseTime!);
+                _totalPausedMilliseconds += pauseDuration.inMilliseconds;
+              }
+              setState(() {
+                _isPaused = false;
+                _lastPauseTime = null;
+                _isFingerDetected = true;
+              });
+              _startMeasurementTimer();
+            }
+          } else {
+            _measurementFingerMissingCount++;
+            _measurementFingerPresentCount = 0;
+            if (_measurementFingerMissingCount >= _measurementFingerDetectionConsecutive && !_isPaused) {
+              // Pause measurement
             setState(() {
               _isPaused = true;
               _lastPauseTime = DateTime.now();
+                _isFingerDetected = false;
             });
-            
-            // Only pause the timer, keep the stream running
             _measurementTimer?.cancel();
-            
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -300,19 +419,7 @@ class _MeasureViewState extends State<MeasureView>
                 ),
               );
             }
-          } else if (isFingerPresent && _isPaused) {
-            // Finger placed back, resume measurement
-            if (_lastPauseTime != null) {
-              final pauseDuration = DateTime.now().difference(_lastPauseTime!);
-              _totalPausedMilliseconds += pauseDuration.inMilliseconds;
             }
-            setState(() {
-              _isPaused = false;
-              _lastPauseTime = null;
-            });
-            
-            // Restart the timer with the correct progress
-            _startMeasurementTimer();
           }
 
           // Only send image to isolate if not paused
@@ -369,8 +476,11 @@ class _MeasureViewState extends State<MeasureView>
     _measurementTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted && !_isPaused) {
         final now = DateTime.now();
-        final totalElapsedMilliseconds = now.difference(_measurementStartTime!).inMilliseconds;
-        final actualElapsedMilliseconds = totalElapsedMilliseconds - _totalPausedMilliseconds;
+        final totalElapsedMilliseconds = now
+            .difference(_measurementStartTime!)
+            .inMilliseconds;
+        final actualElapsedMilliseconds =
+            totalElapsedMilliseconds - _totalPausedMilliseconds;
         final actualElapsedSeconds = (actualElapsedMilliseconds / 1000).floor();
         
         setState(() {
@@ -386,8 +496,22 @@ class _MeasureViewState extends State<MeasureView>
     });
   }
 
-  void _stopMeasurement() {
-    _cameraController?.stopImageStream();
+  Future<void> _stopMeasurementStream() async {
+    if (_isMeasurementStreamRunning) {
+      try {
+        print('[Camera] Stopping measurement stream...');
+        await _cameraController?.stopImageStream();
+      } catch (e) {
+        print('[Camera] Error stopping measurement stream: $e');
+      }
+      _isMeasurementStreamRunning = false;
+    }
+  }
+
+  void _stopMeasurement() async {
+    await _toggleFlashlight(false);
+    await _stopFingerDetectionStream();
+    await _stopMeasurementStream();
     _processingIsolate?.kill();
     _receivePort?.close();
     _measurementTimer?.cancel();
@@ -397,22 +521,20 @@ class _MeasureViewState extends State<MeasureView>
     if (mounted) {
       setState(() {
         isMeasuring = false;
-        // Only show results if we have a valid BPM and completed the measurement
-        if (_estimatedBPM > 0 && _elapsedSeconds >= _measurementDuration) {
-          _toggleFlashlight(false); // Turn off flashlight immediately when measurement is complete
-          _navigateToResults();
-        } else {
-          // If measurement was invalid, reset and show error
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Measurement incomplete. Please try again.'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-          _resetMeasurement();
+        _showResults = true;
+      });
+    }
+    // Restart finger detection after measurement
+    if (mounted) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted && !isMeasuring && !_showResults) {
+          _startFingerDetection();
         }
       });
     }
+    // Reset debounce counters
+    _measurementFingerMissingCount = 0;
+    _measurementFingerPresentCount = 0;
   }
 
   // This function runs in a separate isolate
@@ -576,8 +698,11 @@ class _MeasureViewState extends State<MeasureView>
     });
   }
 
-  void _resetMeasurement() async {
+  Future<void> _resetMeasurement() async {
     // Stop all ongoing processes
+    await _toggleFlashlight(false);
+    await _stopFingerDetectionStream();
+    await _stopMeasurementStream();
     _processingIsolate?.kill();
     _receivePort?.close();
     _measurementTimer?.cancel();
@@ -597,13 +722,11 @@ class _MeasureViewState extends State<MeasureView>
       _cameraSizeController.reverse();
     }
 
-    await _toggleFlashlight(false);
-
-    // Restart finger detection after a short delay
+    // Re-initialize camera and auto-calibrate as on first entry
     if (mounted) {
-      Future.delayed(const Duration(milliseconds: 500), () {
+      Future.delayed(const Duration(milliseconds: 500), () async {
         if (mounted && !isMeasuring && !_showResults) {
-          _startFingerDetection();
+          await _initializeCamera();
         }
       });
     }
@@ -623,7 +746,7 @@ class _MeasureViewState extends State<MeasureView>
     _receivePort?.close();
     _measurementTimer?.cancel();
     WakelockPlus.disable();
-    _toggleFlashlight(false);
+    _toggleFlashlight(false); // Turn off flashlight when leaving the view
     super.dispose();
   }
 
@@ -639,8 +762,7 @@ class _MeasureViewState extends State<MeasureView>
             ? MeasureResultView(
                 estimatedBPM: _estimatedBPM, // Pass the estimated BPM
                 initialContext: _selectedContext, // Pass the selected context
-                onSave:
-                    _resetMeasurement, // Pass the reset function as the save callback
+                onSave: () async => _resetMeasurement(), // Pass the reset function as the save callback
               )
             : (_isCameraInitialized
                   ? (isMeasuring ? _buildMeasuringView() : _buildSetupView())
@@ -652,19 +774,18 @@ class _MeasureViewState extends State<MeasureView>
   Widget _buildSetupView() {
     return Stack(
       children: [
-        // Background
         Container(
           width: double.infinity,
           height: double.infinity,
           color: TColor.bgColor,
-        ),
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                const SizedBox(height: 40), // Top padding
         // Camera preview in circle
-        if (_cameraController != null && _cameraController!.value.isInitialized)
-          Positioned(
-            top: 200,
-            left: 0,
-            right: 0,
-            child: Center(
+                if (_cameraController != null &&
+                    _cameraController!.value.isInitialized)
+                  Center(
               child: AnimatedBuilder(
                 animation: _cameraSizeAnimation,
                 builder: (context, child) {
@@ -685,16 +806,7 @@ class _MeasureViewState extends State<MeasureView>
                 },
               ),
             ),
-          ),
-        // Overlay
-        Container(
-          width: double.infinity,
-          height: double.infinity,
-          color: TColor.bgColor.withOpacity(0.5),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const SizedBox(height: 220), // Space for the camera preview
+                const SizedBox(height: 40), // Space between camera and context
               // Context Selection
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -734,7 +846,8 @@ class _MeasureViewState extends State<MeasureView>
                           child: DropdownButton<String>(
                             isExpanded: true,
                             value: _selectedContext,
-                            items: const [
+                              items:
+                                  const [
                               "After exercise",
                               "At rest",
                               "After medication",
@@ -757,9 +870,7 @@ class _MeasureViewState extends State<MeasureView>
                                 });
                               }
                             },
-                            style: TextStyle(
-                              color: TColor.textColor,
-                            ),
+                              style: TextStyle(color: TColor.textColor),
                             icon: Icon(
                               Icons.arrow_drop_down,
                               color: TColor.textColor,
@@ -787,11 +898,254 @@ class _MeasureViewState extends State<MeasureView>
                         color: TColor.subTextColor,
                         fontSize: 14,
                       ),
-                    ),
-                  ],
+                      ),
+                      const SizedBox(height: 32),
+                      // Threshold sliders for finger detection
+                      // Calibrate button OUTSIDE the collapsible
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.tune),
+                          label: const Text('Calibrate Thresholds'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              if (_lastAvgBrightness != null) {
+                                _fingerDetectionThresholdValue = _lastAvgBrightness! - 2;
+                              }
+                              if (_lastAvgRedness != null) {
+                                _rednessThreshold = _lastAvgRedness! + 2;
+                              }
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Calibrated! Brightness: \\${_fingerDetectionThresholdValue.toStringAsFixed(1)}, Redness: \\${_rednessThreshold.toStringAsFixed(1)}',
+                                ),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // COLLAPSIBLE for all other settings
+                      ExpansionTile(
+                        initiallyExpanded: true,
+                        title: Text(
+                          'Finger Detection Settings',
+                          style: TextStyle(
+                            color: TColor.textColor,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        children: [
+                          const SizedBox(height: 8),
+                          Text(
+                            'Brightness Threshold',
+                            style: TextStyle(
+                              color: TColor.subTextColor,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Slider(
+                            value: _fingerDetectionThresholdValue,
+                            min: 50,
+                            max: 600,
+                            divisions: 550,
+                            label: _fingerDetectionThresholdValue.round().toString(),
+                            onChanged: (value) {
+                              setState(() {
+                                _fingerDetectionThresholdValue = value;
+                              });
+                            },
+                          ),
+                          Text(
+                            'Current: \\${_fingerDetectionThresholdValue.round()}',
+                            style: TextStyle(
+                              color: TColor.subTextColor,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Redness Threshold',
+                            style: TextStyle(
+                              color: TColor.subTextColor,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Slider(
+                            value: _rednessThreshold,
+                            min: 0,
+                            max: 255,
+                            divisions: 255,
+                            label: _rednessThreshold.round().toString(),
+                            onChanged: (value) {
+                              setState(() {
+                                _rednessThreshold = value;
+                              });
+                            },
+                          ),
+                          Text(
+                            'Current: \\${_rednessThreshold.round()}',
+                            style: TextStyle(
+                              color: TColor.subTextColor,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          // Debug info - always visible for troubleshooting
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: TColor.primaryColor1.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: TColor.primaryColor1.withOpacity(0.3),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Debug Info (Real-time)',
+                                      style: TextStyle(
+                                        color: TColor.textColor,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    Icon(
+                                      Icons.info_outline,
+                                      color: TColor.primaryColor1,
+                                      size: 16,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Brightness: \\${_lastAvgBrightness?.toStringAsFixed(1) ?? "---"}',
+                                  style: TextStyle(
+                                    color: TColor.subTextColor,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                                Text(
+                                  'Redness: \\${_lastAvgRedness?.toStringAsFixed(1) ?? "---"}',
+                                  style: TextStyle(
+                                    color: TColor.subTextColor,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                                Text(
+                                  'Flashlight: \\${_isFlashlightOn ? "ON" : "OFF"}',
+                                  style: TextStyle(
+                                    color: TColor.subTextColor,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                                Text(
+                                  'Consecutive Detections: \\$_consecutiveDetections',
+                                  style: TextStyle(
+                                    color: TColor.subTextColor,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Detection Status: \\${_isFlashlightOn && _lastAvgBrightness != null && _lastAvgRedness != null ? (_lastAvgBrightness! < _fingerDetectionThresholdValue && _lastAvgRedness! > _rednessThreshold ? "FINGER DETECTED" : "NO FINGER") : "CHECKING..."}',
+                                  style: TextStyle(
+                                    color: _isFlashlightOn && _lastAvgBrightness != null && _lastAvgRedness != null
+                                        ? (_lastAvgBrightness! < _fingerDetectionThresholdValue && _lastAvgRedness! > _rednessThreshold
+                                            ? Colors.green
+                                            : Colors.red)
+                                        : TColor.subTextColor,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 32), // Add bottom padding for scroll
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Finger detection popup overlay
+        if (_isFingerDetected && !isMeasuring)
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 32, left: 16, right: 16),
+              child: Card(
+                elevation: 8,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? TColor.darkSurface
+                    : Colors.white,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 24,
+                    horizontal: 20,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'Finger detected! Ready to start measurement.',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              _isFingerDetected = false;
+                            });
+                            _startMeasurement();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'Start Measurement',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ],
           ),
         ),
       ],
@@ -807,33 +1161,40 @@ class _MeasureViewState extends State<MeasureView>
       {
         'range': [0, 15],
         'title': 'Step 1: Initial Signal Detection',
-        'info': 'The camera detects subtle changes in light absorption as blood flows through your finger. This is the foundation of photoplethysmography (PPG), a non-invasive way to measure blood flow.',
+        'info':
+            'The camera detects subtle changes in light absorption as blood flows through your finger. This is the foundation of photoplethysmography (PPG), a non-invasive way to measure blood flow.',
       },
       {
         'range': [15, 35],
         'title': 'Step 2: Signal Stabilization',
-        'info': 'The system is now analyzing the stability of your blood flow pattern. A steady signal is crucial for accurate measurements, as it helps filter out any movement artifacts.',
+        'info':
+            'The system is now analyzing the stability of your blood flow pattern. A steady signal is crucial for accurate measurements, as it helps filter out any movement artifacts.',
       },
       {
         'range': [35, 65],
         'title': 'Step 3: Heart Rate Analysis',
-        'info': 'Your heart rate is being calculated by analyzing the time between consecutive heartbeats. This interval, known as the RR interval, is key to understanding your cardiovascular health.',
+        'info':
+            'Your heart rate is being calculated by analyzing the time between consecutive heartbeats. This interval, known as the RR interval, is key to understanding your cardiovascular health.',
       },
       {
         'range': [65, 85],
         'title': 'Step 4: Blood Pressure Estimation',
-        'info': 'Using your heart rate and signal characteristics, the system is estimating your blood pressure. This is done through advanced algorithms that correlate pulse wave characteristics with blood pressure.',
+        'info':
+            'Using your heart rate and signal characteristics, the system is estimating your blood pressure. This is done through advanced algorithms that correlate pulse wave characteristics with blood pressure.',
       },
       {
         'range': [85, 100],
         'title': 'Step 5: Final Analysis',
-        'info': 'The system is now performing final calculations and validating the measurements to ensure accuracy. This includes cross-checking all parameters and applying calibration factors.',
+        'info':
+            'The system is now performing final calculations and validating the measurements to ensure accuracy. This includes cross-checking all parameters and applying calibration factors.',
       },
     ];
 
     // Find current step based on percentage
     final currentStep = steps.firstWhere(
-      (step) => percentage >= (step['range'] as List<int>)[0] && percentage <= (step['range'] as List<int>)[1],
+      (step) =>
+          percentage >= (step['range'] as List<int>)[0] &&
+          percentage <= (step['range'] as List<int>)[1],
       orElse: () => steps.last,
     );
 
@@ -845,7 +1206,8 @@ class _MeasureViewState extends State<MeasureView>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           // Camera preview in circle
-          if (_cameraController != null && _cameraController!.value.isInitialized)
+          if (_cameraController != null &&
+              _cameraController!.value.isInitialized)
             AnimatedBuilder(
               animation: _cameraSizeAnimation,
               builder: (context, child) {
@@ -854,24 +1216,21 @@ class _MeasureViewState extends State<MeasureView>
                   height: _cameraSizeAnimation.value,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: TColor.primaryColor1,
-                      width: 2,
+                    border: Border.all(color: TColor.primaryColor1, width: 2),
                     ),
-                  ),
-                  child: ClipOval(
-                    child: CameraPreview(_cameraController!),
-                  ),
+                  child: ClipOval(child: CameraPreview(_cameraController!)),
                 );
               },
             ),
           const SizedBox(height: 40),
-          // Estimated BPM display
+          // Estimated BPM display or paused state
           Text(
-            _isPaused ? 'Measurement Paused' : (_estimatedBPM > 0 ? '${_estimatedBPM} BPM' : 'Measuring...'),
+            _isPaused
+                ? 'Measurement Paused'
+                : (_estimatedBPM > 0 ? '${_estimatedBPM} BPM' : 'Measuring...'),
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: _isPaused ? TColor.subTextColor : TColor.textColor,
+              color: _isPaused ? Colors.orange : TColor.textColor,
               fontSize: 32,
               fontWeight: FontWeight.w600,
             ),
@@ -879,13 +1238,17 @@ class _MeasureViewState extends State<MeasureView>
           const SizedBox(height: 10),
           // Progress text or instruction
           Text(
-            _isPaused 
+            _isPaused
                 ? 'Place your finger back on the camera to continue'
                 : (_elapsedSeconds >= _measurementDuration - 3
                     ? 'Finishing measurement...'
                     : 'Hold your finger steady on the camera lens with flash on.'),
             textAlign: TextAlign.center,
-            style: TextStyle(color: TColor.subTextColor, fontSize: 16),
+            style: TextStyle(
+              color: _isPaused ? Colors.orange : TColor.subTextColor,
+              fontSize: 16,
+              fontWeight: _isPaused ? FontWeight.bold : FontWeight.normal,
+            ),
           ),
           const SizedBox(height: 40),
           // Progress bar container
@@ -895,10 +1258,10 @@ class _MeasureViewState extends State<MeasureView>
               children: [
                 // Linear progress indicator
                 LinearProgressIndicator(
-                  value: _isPaused ? measurementProgress : measurementProgress,
+                  value: measurementProgress,
                   backgroundColor: TColor.subTextColor.withOpacity(0.2),
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    _isPaused ? TColor.subTextColor : TColor.primaryColor1,
+                    _isPaused ? Colors.orange : TColor.primaryColor1,
                   ),
                   minHeight: 8,
                 ),
@@ -921,7 +1284,7 @@ class _MeasureViewState extends State<MeasureView>
                     Text(
                       '$percentage%',
                       style: TextStyle(
-                        color: TColor.primaryColor1,
+                        color: _isPaused ? Colors.orange : TColor.primaryColor1,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -938,10 +1301,7 @@ class _MeasureViewState extends State<MeasureView>
                   ),
                   child: Text(
                     currentStep['info'] as String,
-                    style: TextStyle(
-                      color: TColor.textColor,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: TColor.textColor, fontSize: 12),
                   ),
                 ),
               ],

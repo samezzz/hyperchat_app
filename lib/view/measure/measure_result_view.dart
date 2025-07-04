@@ -11,10 +11,10 @@ class MeasureResultView extends StatefulWidget {
   final VoidCallback onSave;
 
   const MeasureResultView({
-    Key? key, 
-    required this.estimatedBPM, 
+    Key? key,
+    required this.estimatedBPM,
     required this.initialContext,
-    required this.onSave
+    required this.onSave,
   }) : super(key: key);
 
   @override
@@ -40,7 +40,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
     // Base values adjusted for age and gender (assuming average adult)
     const int baseSystolic = 115;
     const int baseDiastolic = 75;
-    
+
     // Get the context factor
     double contextFactor = 1.0;
     switch (widget.initialContext) {
@@ -85,10 +85,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
     systolic = systolic.clamp(90, 160);
     diastolic = diastolic.clamp(60, 100);
 
-    return {
-      'systolic': systolic,
-      'diastolic': diastolic,
-    };
+    return {'systolic': systolic, 'diastolic': diastolic};
   }
 
   // Get interpretation based on blood pressure and heart rate
@@ -120,7 +117,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
       if (user == null) {
         throw Exception('User not logged in');
       }
-      
+
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       if (userProvider.user == null) {
         throw Exception('User data not loaded');
@@ -130,13 +127,14 @@ class _MeasureResultViewState extends State<MeasureResultView> {
       final startTime = DateTime.now();
 
       // Ensure we have AI analysis before saving
-      _aiAnalysis ??= await _measurementService.geminiService.analyzeMeasurement(
-        systolicBP: _calculatedBP['systolic']!,
-        diastolicBP: _calculatedBP['diastolic']!,
-        heartRate: widget.estimatedBPM,
-        context: widget.initialContext,
-        healthBackground: userProvider.user!.healthBackground,
-      );
+      _aiAnalysis ??= await _measurementService.geminiService
+          .analyzeMeasurement(
+            systolicBP: _calculatedBP['systolic']!,
+            diastolicBP: _calculatedBP['diastolic']!,
+            heartRate: widget.estimatedBPM,
+            context: widget.initialContext,
+            healthBackground: userProvider.user!.healthBackground,
+          );
 
       // Save the measurement with the AI analysis
       await _measurementService.addMeasurement(
@@ -158,7 +156,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
       if (mounted) {
         // First call onSave callback
         widget.onSave();
-        
+
         // Then show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -172,11 +170,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
             ),
             backgroundColor: TColor.primaryColor1,
             behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.only(
-              bottom: 20,
-              left: 16,
-              right: 16,
-            ),
+            margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -203,11 +197,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
             ),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.only(
-              bottom: 80,
-              left: 16,
-              right: 16,
-            ),
+            margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -233,7 +223,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
     final interpretation = _getInterpretation(
       _calculatedBP['systolic']!,
       _calculatedBP['diastolic']!,
-      widget.estimatedBPM
+      widget.estimatedBPM,
     );
 
     return Container(
@@ -253,7 +243,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
                   children: [
                     Text(
                       "Estimated Heart Rate",
-                       style: TextStyle(
+                      style: TextStyle(
                         color: TColor.textColor,
                         fontSize: 24,
                         fontWeight: FontWeight.w600,
@@ -320,10 +310,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
                   const SizedBox(width: 8),
                   Text(
                     "mmHg",
-                    style: TextStyle(
-                      color: TColor.subTextColor,
-                      fontSize: 18,
-                    ),
+                    style: TextStyle(color: TColor.subTextColor, fontSize: 18),
                   ),
                 ],
               ),
@@ -331,33 +318,33 @@ class _MeasureResultViewState extends State<MeasureResultView> {
               const SizedBox(height: 30),
 
               // Feedback/Interpretation
-              Container(
-                padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(
-                  color: TColor.primaryColor1.withAlpha(26),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      color: TColor.primaryColor1,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        interpretation,
-                        style: TextStyle(
-                          color: TColor.primaryColor1,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              // Container(
+              //   padding: const EdgeInsets.all(15),
+              //   decoration: BoxDecoration(
+              //     color: TColor.primaryColor1.withAlpha(26),
+              //     borderRadius: BorderRadius.circular(10),
+              //   ),
+              //   child: Row(
+              //     children: [
+              //       Icon(
+              //         Icons.info_outline,
+              //         color: TColor.primaryColor1,
+              //       ),
+              //       const SizedBox(width: 10),
+              //       Expanded(
+              //         child: Text(
+              //           interpretation,
+              //           style: TextStyle(
+              //             color: TColor.primaryColor1,
+              //             fontSize: 16,
+              //           ),
+              //         ),
+              //       ),
+              //     ],
+              //   ),
+              // ),
 
-                            // Add disclaimer below BP values
+              // Add disclaimer below BP values
               const SizedBox(height: 10),
               Container(
                 padding: EdgeInsets.all(10),
@@ -368,39 +355,52 @@ class _MeasureResultViewState extends State<MeasureResultView> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 22),
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.orange,
+                      size: 22,
+                    ),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Disclaimer: The blood pressure values shown are estimates and are not intended for medical diagnosis or treatment. For accurate blood pressure readings, use a clinically validated BP cuff.',
-                        style: TextStyle(color: Colors.orange[900], fontSize: 14, fontWeight: FontWeight.w500),
+                        style: TextStyle(
+                          color: Colors.orange[900],
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-              
+
               const SizedBox(height: 20),
 
               // AI Analysis Section
               FutureBuilder<Map<String, dynamic>>(
-                future: _aiAnalysis != null 
+                future: _aiAnalysis != null
                     ? Future.value(_aiAnalysis)
-                    : _measurementService.geminiService.analyzeMeasurement(
-                        systolicBP: _calculatedBP['systolic']!,
-                        diastolicBP: _calculatedBP['diastolic']!,
-                        heartRate: widget.estimatedBPM,
-                        context: widget.initialContext,
-                        healthBackground: Provider.of<UserProvider>(context, listen: false).user!.healthBackground,
-                      ).then((analysis) {
-                        _aiAnalysis = analysis;
-                        return analysis;
-                      }),
+                    : _measurementService.geminiService
+                          .analyzeMeasurement(
+                            systolicBP: _calculatedBP['systolic']!,
+                            diastolicBP: _calculatedBP['diastolic']!,
+                            heartRate: widget.estimatedBPM,
+                            context: widget.initialContext,
+                            healthBackground: Provider.of<UserProvider>(
+                              context,
+                              listen: false,
+                            ).user!.healthBackground,
+                          )
+                          .then((analysis) {
+                            _aiAnalysis = analysis;
+                            return analysis;
+                          }),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  
+
                   if (snapshot.hasError) {
                     return Container(
                       padding: const EdgeInsets.all(15),
@@ -431,7 +431,8 @@ class _MeasureResultViewState extends State<MeasureResultView> {
                       // Interpretation
                       _buildAnalysisCard(
                         "Interpretation",
-                        analysis['interpretation'] ?? 'No interpretation available',
+                        analysis['interpretation'] ??
+                            'No interpretation available',
                         Icons.analytics_outlined,
                       ),
                       const SizedBox(height: 10),
@@ -445,7 +446,8 @@ class _MeasureResultViewState extends State<MeasureResultView> {
                         ),
                       const SizedBox(height: 10),
                       // Recommendations
-                      if ((analysis['recommendations'] as List?)?.isNotEmpty ?? false)
+                      if ((analysis['recommendations'] as List?)?.isNotEmpty ??
+                          false)
                         _buildAnalysisCard(
                           "Recommendations",
                           (analysis['recommendations'] as List).join('\n• '),
@@ -464,26 +466,61 @@ class _MeasureResultViewState extends State<MeasureResultView> {
               ),
               const SizedBox(height: 30),
 
-              // Save Button
-              ElevatedButton(
-                onPressed: _isSaving ? null : _saveMeasurement,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: TColor.primaryColor1,
-                  foregroundColor: TColor.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
+              // Save and Retake Buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _isSaving ? null : _saveMeasurement,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: TColor.primaryColor1,
+                        foregroundColor: TColor.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 0,
+                          vertical: 16,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      child: _isSaving
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                              'Save Measurement',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                    ),
                   ),
-                ),
-                child: _isSaving
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        'Save Measurement',
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        widget.onSave();
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: TColor.primaryColor1,
+                        side: BorderSide(color: TColor.primaryColor1, width: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 0,
+                          vertical: 16,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      child: const Text(
+                        'Retake Measurement',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 14,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 20),
             ],
@@ -493,11 +530,16 @@ class _MeasureResultViewState extends State<MeasureResultView> {
     );
   }
 
-  Widget _buildAnalysisCard(String title, String content, IconData icon, {bool isWarning = false}) {
+  Widget _buildAnalysisCard(
+    String title,
+    String content,
+    IconData icon, {
+    bool isWarning = false,
+  }) {
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: isWarning 
+        color: isWarning
             ? Colors.orange.withAlpha(26)
             : TColor.primaryColor1.withAlpha(26),
         borderRadius: BorderRadius.circular(10),
@@ -534,4 +576,4 @@ class _MeasureResultViewState extends State<MeasureResultView> {
       ),
     );
   }
-} 
+}

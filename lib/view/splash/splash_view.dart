@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SplashView extends StatefulWidget {
   const SplashView({super.key});
@@ -31,9 +32,20 @@ class _SplashViewState extends State<SplashView> {
     } else if (user == null) {
       route = '/login';
     } else {
-      // Check if user has completed onboarding
-      final hasCompletedOnboarding = prefs.getBool('hasCompletedOnboarding') ?? false;
-      route = hasCompletedOnboarding ? '/home' : '/onboarding';
+      // Check onboarding completion in Firestore first
+      try {
+        final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        final firestoreCompleted = userDoc.data()?['hasCompletedOnboarding'] == true;
+        if (firestoreCompleted) {
+          route = '/home';
+        } else {
+          route = '/onboarding';
+        }
+      } catch (e) {
+        // Fallback to SharedPreferences if Firestore fails
+        final hasCompletedOnboarding = prefs.getBool('hasCompletedOnboarding') ?? false;
+        route = hasCompletedOnboarding ? '/home' : '/onboarding';
+      }
     }
 
     Navigator.pushReplacementNamed(context, route);

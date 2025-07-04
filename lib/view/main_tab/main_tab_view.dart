@@ -26,7 +26,19 @@ class _MainTabViewState extends State<MainTabView> {
 
     return Scaffold(
       backgroundColor: TColor.bgColor,
-      body: PageStorage(bucket: pageBucket, child: currentTab),
+      body: PageStorage(
+        bucket: pageBucket,
+        child: currentTab is HomeView
+            ? HomeView(
+                onMeasureTabRequested: () {
+                  setState(() {
+                    selectTab = 1;
+                    currentTab = const MeasureView();
+                  });
+                },
+              )
+            : currentTab,
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: Transform.translate(
         offset: const Offset(0, 15),
