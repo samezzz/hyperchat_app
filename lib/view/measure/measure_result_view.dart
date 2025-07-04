@@ -214,11 +214,9 @@ class _MeasureResultViewState extends State<MeasureResultView> {
     }
   }
 
-  // --- Custom Display Logic for Demo Purposes ---
-  // Clamp BPM to 57-61 for display
+  // Display the actual measured BPM from the measure view
   int get displayBPM {
-    // Clamp the estimated BPM to 57-61
-    return widget.estimatedBPM.clamp(57, 61);
+    return widget.estimatedBPM;
   }
 
   // Generate BP in the range 112-122/76-81 for display
