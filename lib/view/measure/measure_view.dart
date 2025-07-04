@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:isolate';
 import 'dart:developer';
 import 'dart:typed_data';
-import 'dart:math';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
@@ -11,6 +11,7 @@ import '../../common/colo_extension.dart';
 import 'package:wakelock_plus/wakelock_plus.dart'; // Corrected import
 import 'package:collection/collection.dart';
 import 'measure_result_view.dart'; // Import the new results view
+import 'package:image/image.dart' as img;
 
 // Data structure for a PPG signal point
 class PpgDataPoint {
@@ -18,6 +19,82 @@ class PpgDataPoint {
   final double value; // Aggregated pixel value
 
   PpgDataPoint(this.timestamp, this.value);
+}
+
+// Add this helper class for a simple IIR bandpass filter
+class SimpleBandpassFilter {
+  final double lowCut;
+  final double highCut;
+  final double sampleRate;
+  double _prevInput = 0.0;
+  double _prevOutput = 0.0;
+  double _prevInput2 = 0.0;
+  double _prevOutput2 = 0.0;
+
+  SimpleBandpassFilter({
+    required this.lowCut,
+    required this.highCut,
+    required this.sampleRate,
+  });
+
+  // Second-order bandpass (biquad) filter coefficients
+  // This is a simple implementation for demonstration; for production, use a DSP library
+  double process(double input) {
+    // Butterworth bandpass coefficients (approximate)
+    // You can tune these for your actual sample rate
+    final double w0 = 2 * 3.141592653589793 * ((lowCut + highCut) / 2) / sampleRate;
+    final double bw = (highCut - lowCut) / sampleRate;
+    final double alpha = (bw / 2) * (1 / (2 * 3.141592653589793));
+    final double cosw0 = math.cos(w0);
+    final double a0 = 1 + alpha;
+    final double a1 = -2 * cosw0;
+    final double a2 = 1 - alpha;
+    final double b0 = alpha;
+    final double b1 = 0;
+    final double b2 = -alpha;
+
+    double output = (b0 / a0) * input + (b1 / a0) * _prevInput + (b2 / a0) * _prevInput2
+      - (a1 / a0) * _prevOutput - (a2 / a0) * _prevOutput2;
+    _prevInput2 = _prevInput;
+    _prevInput = input;
+    _prevOutput2 = _prevOutput;
+    _prevOutput = output;
+    return output;
+  }
+}
+
+// Custom painter for the signal graph
+class _SignalGraphPainter extends CustomPainter {
+  final List<double> values;
+  _SignalGraphPainter(this.values);
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (values.isEmpty) return;
+    final paint = Paint()
+      ..color = Colors.cyanAccent
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+    // Subtract mean for visualization to center the graph
+    final mean = values.reduce((a, b) => a + b) / values.length;
+    final centered = values.map((v) => v - mean).toList();
+    final minVal = centered.reduce(math.min);
+    final maxVal = centered.reduce(math.max);
+    final scaleY = maxVal > minVal ? (size.height / (maxVal - minVal)) : 1.0;
+    final dx = size.width / (centered.length - 1);
+    final path = Path();
+    for (int i = 0; i < centered.length; i++) {
+      final x = i * dx;
+      final y = size.height - ((centered[i] - minVal) * scaleY);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    canvas.drawPath(path, paint);
+  }
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
 class MeasureView extends StatefulWidget {
@@ -79,6 +156,25 @@ class _MeasureViewState extends State<MeasureView>
   List<double> _autoCalibBrightness = [];
   List<double> _autoCalibRedness = [];
   bool _isFingerDetectionStreamRunning = false;
+
+  // --- Additions for heatmap and graph preview ---
+  List<double> _recentRedValues = [];
+  static const int _signalBufferLength = 200;
+  Uint8List? _lastHeatmapImage;
+
+  // Add a counter for heatmap update throttling
+  int _heatmapFrameCounter = 0;
+  static const int _heatmapUpdateInterval = 3; // Update every 3 frames
+  Isolate? _heatmapIsolate;
+  ReceivePort? _heatmapReceivePort;
+
+  // --- Additions for filtered signal plot ---
+  List<double> _filteredSignalBuffer = [];
+  static const int _filteredSignalBufferLength = 200;
+
+  // Add adaptive measurement constants
+  static const int maxMeasurementDuration = 60; // seconds
+  static const int minGoodIntervals = 25;
 
   @override
   void initState() {
@@ -265,9 +361,10 @@ class _MeasureViewState extends State<MeasureView>
           double avgB = _autoCalibBrightness.reduce((a, b) => a + b) / _autoCalibBrightness.length;
           double avgR = _autoCalibRedness.reduce((a, b) => a + b) / _autoCalibRedness.length;
           setState(() {
-            _fingerDetectionThresholdValue = avgB - 5;
+            _fingerDetectionThresholdValue = (avgB - 5).clamp(50.0, 600.0);
             _rednessThreshold = avgR + 5;
             _hasAutoCalibrated = true;
+            _isFingerDetected = false;
           });
           // Schedule stopImageStream outside the callback
           Future.microtask(() async {
@@ -366,7 +463,7 @@ class _MeasureViewState extends State<MeasureView>
     print('[Camera] Starting measurement stream...');
     await Future.delayed(const Duration(milliseconds: 300));
     try {
-      _cameraController!.startImageStream((CameraImage image) {
+      _cameraController!.startImageStream((CameraImage image) async {
         if (isMeasuring) {
           // Calculate average brightness from Y plane for finger detection
           double avgBrightness = 0;
@@ -379,10 +476,48 @@ class _MeasureViewState extends State<MeasureView>
           if (image.planes.length >= 3) {
             avgRedness = image.planes[2].bytes.reduce((a, b) => a + b) / image.planes[2].bytes.length;
           }
-
+          // --- Update signal buffer for graph and debug info ---
+          setState(() {
+            _recentRedValues.add(avgRedness);
+            if (_recentRedValues.length > _signalBufferLength) {
+              _recentRedValues.removeAt(0);
+            }
+            _lastAvgBrightness = avgBrightness;
+            _lastAvgRedness = avgRedness;
+          });
+          // --- Throttle and move heatmap generation to isolate ---
+          _heatmapFrameCounter++;
+          if (_heatmapFrameCounter % _heatmapUpdateInterval == 0) {
+            // Compute mean and stddev for normalization
+            final yPlane = image.planes[0].bytes;
+            double mean = yPlane.reduce((a, b) => a + b) / yPlane.length;
+            double sqSum = yPlane.fold(0.0, (sum, v) => sum + (v - mean) * (v - mean));
+            double stddev = math.sqrt(sqSum / yPlane.length);
+            double minVal = mean - 2 * stddev;
+            double maxVal = mean + 2 * stddev;
+            // Kill previous isolate if running
+            _heatmapIsolate?.kill(priority: Isolate.immediate);
+            _heatmapReceivePort?.close();
+            _heatmapReceivePort = ReceivePort();
+            _heatmapIsolate = await Isolate.spawn(
+              _heatmapIsolateEntry,
+              {
+                'image': image,
+                'sendPort': _heatmapReceivePort!.sendPort,
+                'minVal': minVal,
+                'maxVal': maxVal,
+              },
+            );
+            _heatmapReceivePort!.listen((data) {
+              if (mounted) {
+                setState(() {
+                  _lastHeatmapImage = data as Uint8List;
+                });
+              }
+            });
+          }
           // Use combined checks: brightness low, redness high
           bool isFingerPresent = avgBrightness < _fingerDetectionThresholdValue && avgRedness > _rednessThreshold;
-
           // Debounce logic for pausing/resuming
           if (isFingerPresent) {
             _measurementFingerPresentCount++;
@@ -421,7 +556,6 @@ class _MeasureViewState extends State<MeasureView>
             }
             }
           }
-
           // Only send image to isolate if not paused
           if (!_isPaused) {
             _sendPort?.send(image);
@@ -461,39 +595,44 @@ class _MeasureViewState extends State<MeasureView>
       } else if (message is String && message == 'measurement_complete') {
         // Isolate signals measurement is complete (optional, using timer for now)
         // _stopMeasurement(); // We'll use the timer for now for consistent duration
+      } else if (message is Map && message.containsKey('filteredSignal')) {
+        if (mounted) {
+          setState(() {
+            _filteredSignalBuffer = List<double>.from(message['filteredSignal']);
+          });
+        }
+      } else if (message is String && message == 'finish_early') {
+        if (mounted) {
+          _measurementTimer?.cancel();
+          _stopMeasurement();
+        }
       }
     });
   }
 
-  void _startMeasurementTimer() {
+  Future<void> _startMeasurementTimer() {
     _measurementTimer?.cancel(); // Cancel any existing timer
-    
     // Set the start time if this is the first start
     if (_measurementStartTime == null) {
       _measurementStartTime = DateTime.now();
     }
-    
     _measurementTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted && !_isPaused) {
         final now = DateTime.now();
-        final totalElapsedMilliseconds = now
-            .difference(_measurementStartTime!)
-            .inMilliseconds;
-        final actualElapsedMilliseconds =
-            totalElapsedMilliseconds - _totalPausedMilliseconds;
+        final totalElapsedMilliseconds = now.difference(_measurementStartTime!).inMilliseconds;
+        final actualElapsedMilliseconds = totalElapsedMilliseconds - _totalPausedMilliseconds;
         final actualElapsedSeconds = (actualElapsedMilliseconds / 1000).floor();
-        
         setState(() {
           _elapsedSeconds = actualElapsedSeconds;
-          measurementProgress = _elapsedSeconds / _measurementDuration;
-
-          if (_elapsedSeconds >= _measurementDuration) {
+          measurementProgress = _elapsedSeconds / maxMeasurementDuration;
+          if (_elapsedSeconds >= maxMeasurementDuration) {
             _measurementTimer?.cancel();
             _stopMeasurement();
           }
         });
       }
     });
+    return Future.value();
   }
 
   Future<void> _stopMeasurementStream() async {
@@ -549,153 +688,171 @@ class _MeasureViewState extends State<MeasureView>
     final int windowSize =
         60 * 5; // Process data over 5 seconds (assuming 60 fps)
     final int bufferSize = 60 * 15; // Keep 15 seconds of data in buffer
-
-    // --- Signal Processing and Peak Detection Variables ---
-    // Simple moving average filter
-    final int filterWindowSize = 5;
+    final int dcWindowSize = 60; // Sliding window mean for DC removal
     List<double> rawSignalBuffer = [];
     List<double> filteredSignal = [];
 
+    // --- Signal Processing and Peak Detection Variables ---
+    // Simple moving average filter
+    final int filterWindowSize = 2;
+
     // Peak detection parameters (will need tuning)
-    final double peakProminence = 5.0; // Minimum peak prominence
-    final double minPeakDistance =
-        0.5; // Minimum distance between peaks in seconds
+    final double peakProminence = 5.0; // Minimum peak prominence (not used in current logic)
+    final double minPeakDistance = 0.35; // Minimum distance between peaks in seconds
 
     // --- Heart Rate Calculation Variables ---
     List<int> peakTimestamps = []; // Timestamps of detected peaks
+
+    // Place this near your signal processing variables
+    final double sampleRate = 30.0; // Adjust if your frame rate is different
+    final SimpleBandpassFilter bandpassFilter = SimpleBandpassFilter(
+      lowCut: 0.8, // Hz
+      highCut: 3.0, // Hz
+      sampleRate: sampleRate,
+    );
+
+    List<int> bpmBuffer = [];
 
     receivePort.listen((message) {
       if (message is CameraImage) {
         int timestamp = DateTime.now().millisecondsSinceEpoch;
 
-        // 1. Extract Green Channel Intensity
-        // Assuming YUV420_888 format based on camera controller setup
-        // The Y plane is luminance, U and V are chrominance.
-        // Green channel intensity can be approximated from Y plane,
-        // or more accurately, process all planes and convert to RGB
-        // or use a native plugin for direct RGB access.
-        // For simplicity here, we'll use the average luminance from the Y plane
-        // as a proxy for PPG signal, similar to lib2/lib8, but this is a limitation
-        // of purely Dart-based access to specific color channels in YUV.
-        // A more robust implementation would process RGB data.
+        // 1. Extract Red Channel Intensity (plane 2)
         double avgIntensity = 0;
-        if (message.planes.isNotEmpty) {
-          // A more accurate method for green channel in YUV:
-          // Iterate over Y plane and use approximate conversion
-          // Or, if available, use a library that provides easier access.
-          // For now, sticking to the simple average of Y plane for demonstration
-          avgIntensity =
-              message.planes[0].bytes.reduce(
-                (value, element) => value + element,
-              ) /
-              message.planes[0].bytes.length;
+        if (message.planes.length >= 3) {
+          avgIntensity = message.planes[2].bytes.reduce((a, b) => a + b) / message.planes[2].bytes.length;
         } else {
-          // Handle case where planes are empty
+          // Handle case where planes are missing
           return;
         }
 
-        // Store the raw data point
+        // --- Sliding window mean for DC removal ---
         rawSignalBuffer.add(avgIntensity);
-        if (rawSignalBuffer.length > bufferSize) {
+        if (rawSignalBuffer.length > dcWindowSize) {
           rawSignalBuffer.removeAt(0);
         }
-        ppgData.add(PpgDataPoint(timestamp, avgIntensity));
+        double slidingMean = rawSignalBuffer.reduce((a, b) => a + b) / rawSignalBuffer.length;
+        double centeredSignal = avgIntensity - slidingMean;
+        double amplifiedSignal = centeredSignal * 60.0;
+        // --- Debug output for raw and processed values ---
+        if (filteredSignal.length % 30 == 0) {
+          print('[PPG] Raw red: $avgIntensity, Centered: $centeredSignal, Amplified: $amplifiedSignal');
+        }
+        ppgData.add(PpgDataPoint(timestamp, amplifiedSignal));
         if (ppgData.length > bufferSize) {
           ppgData.removeAt(0);
         }
 
         // 2. Apply Simple Moving Average Filter
-        if (rawSignalBuffer.length >= filterWindowSize) {
+        if (ppgData.length >= filterWindowSize) {
           double movingAverage =
-              rawSignalBuffer
-                  .sublist(rawSignalBuffer.length - filterWindowSize)
+              ppgData
+                  .sublist(ppgData.length - filterWindowSize)
+                  .map((e) => e.value)
                   .reduce((a, b) => a + b) /
               filterWindowSize;
-          filteredSignal.add(movingAverage);
-          if (filteredSignal.length > bufferSize) {
-            filteredSignal.removeAt(0);
-          }
 
-          // 3. Peak Detection (Simple approach based on local maxima and distance)
-          if (filteredSignal.length > 1) {
-            // A basic peak detection looks for a point higher than its immediate neighbors.
-            // For better robustness, we check against a few previous points after filtering.
+          filteredSignal.add(movingAverage);
+          // Debug: print filtered signal value
+          if (filteredSignal.length % 30 == 0) {
+            print('[PPG] Filtered signal sample: $movingAverage');
+          }
+        }
+
+        // 3. Peak Detection (Derivative-based approach)
             if (filteredSignal.length > 2) {
               int lastIndex = filteredSignal.length - 1;
-              double currentValue = filteredSignal[lastIndex];
-              double previousValue = filteredSignal[lastIndex - 1];
-              double previousValue2 = filteredSignal[lastIndex - 2];
+          double prevValue2 = filteredSignal[lastIndex - 2];
+          double prevValue1 = filteredSignal[lastIndex - 1];
+          double currValue = filteredSignal[lastIndex];
 
-              // Check if current value is a local maximum compared to recent points
-              if (currentValue > previousValue &&
-                  previousValue >= previousValue2) {
-                // Consider this a potential peak.
-                // Add filtering for realistic peaks (e.g., minimum distance and prominence)
-                int currentPeakTimestamp = ppgData
-                    .last
-                    .timestamp; // Use timestamp of the latest data point
+          double derivPrev = prevValue1 - prevValue2;
+          double derivCurr = currValue - prevValue1;
 
+          // Detect a maximum: derivative changes from positive to negative
+          bool isMaxPeak = (derivPrev > 0 && derivCurr < 0);
+          // Detect a minimum: derivative changes from negative to positive
+          bool isMinPeak = (derivPrev < 0 && derivCurr > 0);
+
+          print('[PPG] Deriv-based peak check: prev2=$prevValue2, prev1=$prevValue1, curr=$currValue, derivPrev=$derivPrev, derivCurr=$derivCurr, isMaxPeak=$isMaxPeak, isMinPeak=$isMinPeak');
+
+          if (isMaxPeak) {
+            int currentPeakTimestamp = ppgData[ppgData.length - 2].timestamp;
                 bool isTooCloseToLastPeak = false;
                 if (peakTimestamps.isNotEmpty) {
                   int timeDiff = currentPeakTimestamp - peakTimestamps.last;
                   if (timeDiff < minPeakDistance * 1000) {
-                    // minPeakDistance in milliseconds
                     isTooCloseToLastPeak = true;
                   }
                 }
-
-                // Simple check for prominence could involve comparing the peak value
-                // to the surrounding minima. This basic check is omitted for simplicity
-                // but is important for a robust implementation.
-                bool meetsProminence = true; // Placeholder - needs a real check
-
-                if (!isTooCloseToLastPeak && meetsProminence) {
+            if (!isTooCloseToLastPeak) {
                   peakTimestamps.add(currentPeakTimestamp);
-                  // Keep peakTimestamps buffer size in check (e.g., last 30 seconds of peaks)
-                  // A window based on time or a fixed number of peaks related to expected heart rate range is better.
+              print('[PPG] Deriv-based MAX peak detected at $currentPeakTimestamp, total peaks: ${peakTimestamps.length}');
+              // Keep peakTimestamps buffer size in check
                   if (peakTimestamps.length > 50) {
-                    // Example: Keep last ~50 peaks
                     peakTimestamps.removeAt(0);
                   }
-
                   // 4. Calculate Heart Rate from NN Intervals (if enough peaks)
-                  // Need at least two peaks to calculate an interval. More peaks for a stable average.
                   if (peakTimestamps.length > 5) {
-                    // Require a minimum number of peaks for calculation
+                // Signal quality check: require variance above threshold
+                double variance = 0;
+                if (filteredSignal.length > 1) {
+                  double mean = filteredSignal.reduce((a, b) => a + b) / filteredSignal.length;
+                  variance = filteredSignal.map((v) => (v - mean) * (v - mean)).reduce((a, b) => a + b) / (filteredSignal.length - 1);
+                }
+                const double minVarianceThreshold = 0.1;
+                print('[PPG] Signal variance: $variance');
+                if (variance < minVarianceThreshold) {
+                  print('[PPG] Variance below threshold ($variance < $minVarianceThreshold), skipping BPM calculation.');
+                  return;
+                }
                     List<int> nnIntervals = [];
                     for (int i = 1; i < peakTimestamps.length; i++) {
                       nnIntervals.add(
                         peakTimestamps[i] - peakTimestamps[i - 1],
                       );
                     }
-
-                    // Basic outlier removal for NN intervals (optional but good practice)
-                    // Can implement something like removing intervals significantly different from the median.
-                    // For simplicity, skipping outlier removal in this basic implementation.
-
-                    // Calculate average NN interval
-                    double averageNN =
-                        nnIntervals.reduce((a, b) => a + b) /
-                        nnIntervals.length;
-
-                    // Calculate BPM: 60 seconds / average NN interval in seconds
-                    if (averageNN > 0) {
-                      int calculatedBPM = (60000 / averageNN).round();
-
-                      // Simple validation for plausible BPM range
-                      if (calculatedBPM > 30 && calculatedBPM < 180) {
-                        // Send BPM back to main isolate
-                        sendPort.send(calculatedBPM);
-                      }
+                print('[PPG] NN intervals: $nnIntervals');
+                // Stricter outlier removal: keep only intervals within 0.7x–1.3x the median and between 600ms–2000ms
+                if (nnIntervals.isNotEmpty) {
+                  List<int> sortedNN = List.from(nnIntervals)..sort();
+                  double median = sortedNN.length % 2 == 1
+                      ? sortedNN[sortedNN.length ~/ 2].toDouble()
+                      : (sortedNN[sortedNN.length ~/ 2 - 1] + sortedNN[sortedNN.length ~/ 2]) / 2.0;
+                  nnIntervals = nnIntervals.where((v) => v > 0.7 * median && v < 1.3 * median && v >= 600 && v <= 2000).toList();
+                }
+                // Use the median of the filtered intervals for BPM calculation
+                // Smooth the BPM using a moving average of the last 5 BPM values
+                if (nnIntervals.length >= 5) {
+                  List<int> sortedNN = List.from(nnIntervals)..sort();
+                  double medianNN = sortedNN.length % 2 == 1
+                      ? sortedNN[sortedNN.length ~/ 2].toDouble()
+                      : (sortedNN[sortedNN.length ~/ 2 - 1] + sortedNN[sortedNN.length ~/ 2]) / 2.0;
+                  // Calculate BPM: 60 seconds / median NN interval in seconds
+                  if (medianNN > 0) {
+                    int calculatedBPM = (60000 / medianNN).round();
+                    if (calculatedBPM > 30 && calculatedBPM < 180) {
+                      // Moving average buffer for BPM
+                      bpmBuffer.add(calculatedBPM);
+                      if (bpmBuffer.length > 5) bpmBuffer.removeAt(0);
+                      int smoothedBPM = (bpmBuffer.reduce((a, b) => a + b) / bpmBuffer.length).round();
+                      sendPort.send(smoothedBPM);
                     }
                   }
                 }
+                // If enough good intervals, finish early (adaptive measurement)
+                if (nnIntervals.length >= minGoodIntervals) {
+                  sendPort.send('finish_early');
+                }
               }
             }
+          if (isMinPeak) {
+            int currentMinTimestamp = ppgData[ppgData.length - 2].timestamp;
+            print('[PPG] Deriv-based MIN peak detected at $currentMinTimestamp');
           }
         }
       }
-    });
+    }});
   }
 
   Future<void> _resetMeasurement() async {
@@ -718,6 +875,7 @@ class _MeasureViewState extends State<MeasureView>
         _measurementStartTime = null;
         _lastPauseTime = null;
         _isPaused = false;
+        _isFingerDetected = false;
       });
       _cameraSizeController.reverse();
     }
@@ -916,7 +1074,7 @@ class _MeasureViewState extends State<MeasureView>
                           onPressed: () {
                             setState(() {
                               if (_lastAvgBrightness != null) {
-                                _fingerDetectionThresholdValue = _lastAvgBrightness! - 2;
+                                _fingerDetectionThresholdValue = (_lastAvgBrightness! - 2).clamp(50.0, 600.0);
                               }
                               if (_lastAvgRedness != null) {
                                 _rednessThreshold = _lastAvgRedness! + 2;
@@ -935,151 +1093,162 @@ class _MeasureViewState extends State<MeasureView>
                       ),
                       const SizedBox(height: 8),
                       // COLLAPSIBLE for all other settings
-                      ExpansionTile(
-                        initiallyExpanded: true,
-                        title: Text(
-                          'Finger Detection Settings',
-                          style: TextStyle(
-                            color: TColor.textColor,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        children: [
-                          const SizedBox(height: 8),
-                          Text(
-                            'Brightness Threshold',
-                            style: TextStyle(
-                              color: TColor.subTextColor,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Slider(
-                            value: _fingerDetectionThresholdValue,
-                            min: 50,
-                            max: 600,
-                            divisions: 550,
-                            label: _fingerDetectionThresholdValue.round().toString(),
-                            onChanged: (value) {
-                              setState(() {
-                                _fingerDetectionThresholdValue = value;
-                              });
-                            },
-                          ),
-                          Text(
-                            'Current: ${_fingerDetectionThresholdValue.round()}',
-                            style: TextStyle(
-                              color: TColor.subTextColor,
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Redness Threshold',
-                            style: TextStyle(
-                              color: TColor.subTextColor,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Slider(
-                            value: _rednessThreshold,
-                            min: 0,
-                            max: 255,
-                            divisions: 255,
-                            label: _rednessThreshold.round().toString(),
-                            onChanged: (value) {
-                              setState(() {
-                                _rednessThreshold = value;
-                              });
-                            },
-                          ),
-                          Text(
-                            'Current: ${_rednessThreshold.round()}',
-                            style: TextStyle(
-                              color: TColor.subTextColor,
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          // Debug info - always visible for troubleshooting
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: TColor.primaryColor1.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: TColor.primaryColor1.withOpacity(0.3),
+                      Theme(
+                        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                        child: Container(
+                          color: Colors.transparent,
+                          child: ExpansionTile(
+                            initiallyExpanded: true,
+                            backgroundColor: Colors.transparent,
+                            collapsedBackgroundColor: Colors.transparent,
+                            tilePadding: EdgeInsets.zero,
+                            childrenPadding: EdgeInsets.zero,
+                            maintainState: true,
+                            title: Text(
+                              'Finger Detection Settings',
+                              style: TextStyle(
+                                color: TColor.textColor,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const SizedBox(height: 8),
+                              Text(
+                                'Brightness Threshold',
+                                style: TextStyle(
+                                  color: TColor.subTextColor,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Slider(
+                                value: _fingerDetectionThresholdValue.clamp(50.0, 600.0),
+                                min: 50,
+                                max: 600,
+                                divisions: 550,
+                                label: _fingerDetectionThresholdValue.round().toString(),
+                                onChanged: (value) {
+                                  setState(() {
+                                    _fingerDetectionThresholdValue = value;
+                                  });
+                                },
+                              ),
+                              Text(
+                                'Current: ${_fingerDetectionThresholdValue.round()}',
+                                style: TextStyle(
+                                  color: TColor.subTextColor,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Redness Threshold',
+                                style: TextStyle(
+                                  color: TColor.subTextColor,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Slider(
+                                value: _rednessThreshold,
+                                min: 0,
+                                max: 255,
+                                divisions: 255,
+                                label: _rednessThreshold.round().toString(),
+                                onChanged: (value) {
+                                  setState(() {
+                                    _rednessThreshold = value;
+                                  });
+                                },
+                              ),
+                              Text(
+                                'Current: ${_rednessThreshold.round()}',
+                                style: TextStyle(
+                                  color: TColor.subTextColor,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              // Debug info - always visible for troubleshooting
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: TColor.primaryColor1.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: TColor.primaryColor1.withOpacity(0.3),
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Debug Info (Real-time)',
+                                          style: TextStyle(
+                                            color: TColor.textColor,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        Icon(
+                                          Icons.info_outline,
+                                          color: TColor.primaryColor1,
+                                          size: 16,
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
                                     Text(
-                                      'Debug Info (Real-time)',
+                                      'Brightness: ${_lastAvgBrightness?.toStringAsFixed(1) ?? "---"}',
                                       style: TextStyle(
-                                        color: TColor.textColor,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
+                                        color: TColor.subTextColor,
+                                        fontSize: 11,
                                       ),
                                     ),
-                                    Icon(
-                                      Icons.info_outline,
-                                      color: TColor.primaryColor1,
-                                      size: 16,
+                                    Text(
+                                      'Redness: ${_lastAvgRedness?.toStringAsFixed(1) ?? "---"}',
+                                      style: TextStyle(
+                                        color: TColor.subTextColor,
+                                        fontSize: 11,
+                                      ),
                                     ),
-                                  ],
+                                    Text(
+                                      'Flashlight: ${_isFlashlightOn ? "ON" : "OFF"}',
+                                      style: TextStyle(
+                                        color: TColor.subTextColor,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Consecutive Detections: $_consecutiveDetections',
+                                      style: TextStyle(
+                                        color: TColor.subTextColor,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Detection Status: ${_isFlashlightOn && _lastAvgBrightness != null && _lastAvgRedness != null ? (_lastAvgBrightness! < _fingerDetectionThresholdValue && _lastAvgRedness! > _rednessThreshold ? "FINGER DETECTED" : "NO FINGER") : "CHECKING..."}',
+                                      style: TextStyle(
+                                        color: _isFlashlightOn && _lastAvgBrightness != null && _lastAvgRedness != null
+                                            ? (_lastAvgBrightness! < _fingerDetectionThresholdValue && _lastAvgRedness! > _rednessThreshold
+                                                ? Colors.green
+                                                : Colors.red)
+                                            : TColor.subTextColor,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
                                 ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Brightness: ${_lastAvgBrightness?.toStringAsFixed(1) ?? "---"}',
-                                  style: TextStyle(
-                                    color: TColor.subTextColor,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                                Text(
-                                  'Redness: ${_lastAvgRedness?.toStringAsFixed(1) ?? "---"}',
-                                  style: TextStyle(
-                                    color: TColor.subTextColor,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                                Text(
-                                  'Flashlight: ${_isFlashlightOn ? "ON" : "OFF"}',
-                                  style: TextStyle(
-                                    color: TColor.subTextColor,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                                Text(
-                                  'Consecutive Detections: $_consecutiveDetections',
-                                  style: TextStyle(
-                                    color: TColor.subTextColor,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Detection Status: ${_isFlashlightOn && _lastAvgBrightness != null && _lastAvgRedness != null ? (_lastAvgBrightness! < _fingerDetectionThresholdValue && _lastAvgRedness! > _rednessThreshold ? "FINGER DETECTED" : "NO FINGER") : "CHECKING..."}',
-                                  style: TextStyle(
-                                    color: _isFlashlightOn && _lastAvgBrightness != null && _lastAvgRedness != null
-                                        ? (_lastAvgBrightness! < _fingerDetectionThresholdValue && _lastAvgRedness! > _rednessThreshold
-                                            ? Colors.green
-                                            : Colors.red)
-                                        : TColor.subTextColor,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                       const SizedBox(height: 32), // Add bottom padding for scroll
                     ],
@@ -1090,7 +1259,7 @@ class _MeasureViewState extends State<MeasureView>
           ),
         ),
         // Finger detection popup overlay
-        if (_isFingerDetected && !isMeasuring)
+        if (_isFingerDetected && !isMeasuring && _hasAutoCalibrated && _isFingerDetectionStreamRunning)
           Align(
             alignment: Alignment.bottomCenter,
             child: Padding(
@@ -1205,23 +1374,44 @@ class _MeasureViewState extends State<MeasureView>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Camera preview in circle
+          // Camera preview in circle with overlays (no toggle)
           if (_cameraController != null &&
               _cameraController!.value.isInitialized)
             AnimatedBuilder(
               animation: _cameraSizeAnimation,
               builder: (context, child) {
-                return Container(
+                return Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
                   width: _cameraSizeAnimation.value,
                   height: _cameraSizeAnimation.value,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: TColor.primaryColor1, width: 2),
+                        border: Border.all(color: TColor.primaryColor1, width: 2),
+                  ),
+                  child: ClipOval(
+                    child: CameraPreview(_cameraController!),
+                  ),
                     ),
-                  child: ClipOval(child: CameraPreview(_cameraController!)),
+                    // Always show signal graph overlay
+                    _buildSignalGraphOverlay(),
+                  ],
                 );
               },
             ),
+          // Heatmap preview below the camera preview
+          if (_lastHeatmapImage != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
+              child: SizedBox(
+                width: _cameraSizeAnimation.value,
+                height: _cameraSizeAnimation.value * 0.6, // 60% of preview height
+                child: _buildHeatmapPreview(),
+              ),
+            ),
+          // Filtered signal plot below the heatmap
+          _buildFilteredSignalPlot(),
           const SizedBox(height: 40),
           // Estimated BPM display or paused state
           Text(
@@ -1238,7 +1428,7 @@ class _MeasureViewState extends State<MeasureView>
           const SizedBox(height: 10),
           // Progress text or instruction
           Text(
-            _isPaused
+            _isPaused 
                 ? 'Place your finger back on the camera to continue'
                 : (_elapsedSeconds >= _measurementDuration - 3
                     ? 'Finishing measurement...'
@@ -1312,6 +1502,105 @@ class _MeasureViewState extends State<MeasureView>
     );
   }
 
+  // Helper: Map value to heatmap color (simple blue-green-yellow-red)
+  Color _heatmapColor(double value, double min, double max) {
+    final norm = ((value - min) / (max - min)).clamp(0.0, 1.0);
+    if (norm < 0.25) {
+      // Blue to Green
+      return Color.lerp(Colors.blue, Colors.green, norm / 0.25)!;
+    } else if (norm < 0.5) {
+      // Green to Yellow
+      return Color.lerp(Colors.green, Colors.yellow, (norm - 0.25) / 0.25)!;
+    } else if (norm < 0.75) {
+      // Yellow to Orange
+      return Color.lerp(Colors.yellow, Colors.orange, (norm - 0.5) / 0.25)!;
+    } else {
+      // Orange to Red
+      return Color.lerp(Colors.orange, Colors.red, (norm - 0.75) / 0.25)!;
+    }
+  }
+
+  // Helper: Generate heatmap image from red channel values
+  Future<Uint8List> _generateHeatmapImage(CameraImage image) async {
+    final width = image.width;
+    final height = image.height;
+    final yPlane = image.planes[0].bytes;
+    double mean = yPlane.reduce((a, b) => a + b) / yPlane.length;
+    double sqSum = yPlane.fold(0.0, (sum, v) => sum + (v - mean) * (v - mean));
+    double stddev = math.sqrt(sqSum / yPlane.length);
+    double minVal = mean - 2 * stddev;
+    double maxVal = mean + 2 * stddev;
+
+    // Create an image buffer using the image package
+    final img.Image heatmapImg = img.Image(width: width, height: height);
+
+    for (int i = 0; i < yPlane.length; i++) {
+      final y = yPlane[i].toDouble();
+      final color = _heatmapColor(y, minVal, maxVal);
+      heatmapImg.setPixelRgba(
+        i % width,
+        i ~/ width,
+        color.red,
+        color.green,
+        color.blue,
+        255,
+      );
+    }
+
+    // Encode as PNG
+    return Uint8List.fromList(img.encodePng(heatmapImg));
+  }
+
+  // Widget: Heatmap preview
+  Widget _buildHeatmapPreview() {
+    if (_lastHeatmapImage == null || _cameraController == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final width = _cameraController!.value.previewSize?.width ?? 160;
+    final height = _cameraController!.value.previewSize?.height ?? 120;
+    return Image.memory(
+      _lastHeatmapImage!,
+      width: _cameraSizeAnimation.value,
+      height: _cameraSizeAnimation.value,
+      fit: BoxFit.cover,
+      gaplessPlayback: true,
+    );
+  }
+
+  // Widget: Real-time signal graph overlay
+  Widget _buildSignalGraphOverlay() {
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: SizedBox(
+        height: 40,
+        child: CustomPaint(
+          painter: _SignalGraphPainter(_recentRedValues),
+          size: Size(_cameraSizeAnimation.value, 40),
+        ),
+      ),
+    );
+  }
+
+  // Widget: Filtered signal plot
+  Widget _buildFilteredSignalPlot() {
+    if (_filteredSignalBuffer.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
+      child: SizedBox(
+        width: _cameraSizeAnimation.value,
+        height: 60,
+        child: CustomPaint(
+          painter: _SignalGraphPainter(_filteredSignalBuffer),
+          size: Size(_cameraSizeAnimation.value, 60),
+        ),
+      ),
+    );
+  }
+
   void _navigateToResults() {
     if (mounted) {
       setState(() {
@@ -1319,5 +1608,42 @@ class _MeasureViewState extends State<MeasureView>
         isMeasuring = false;
       });
     }
+  }
+
+  // Helper for isolate entry
+  static void _heatmapIsolateEntry(Map<String, dynamic> args) async {
+    final CameraImage image = args['image'];
+    final SendPort sendPort = args['sendPort'];
+    final double minVal = args['minVal'];
+    final double maxVal = args['maxVal'];
+    final int width = image.width;
+    final int height = image.height;
+    final yPlane = image.planes[0].bytes;
+    final img.Image heatmapImg = img.Image(width: width, height: height);
+    for (int i = 0; i < yPlane.length; i++) {
+      final y = yPlane[i].toDouble();
+      // Use a simple blue-green-yellow-red mapping
+      Color color;
+      final norm = ((y - minVal) / (maxVal - minVal)).clamp(0.0, 1.0);
+      if (norm < 0.25) {
+        color = Color.lerp(Colors.blue, Colors.green, norm / 0.25)!;
+      } else if (norm < 0.5) {
+        color = Color.lerp(Colors.green, Colors.yellow, (norm - 0.25) / 0.25)!;
+      } else if (norm < 0.75) {
+        color = Color.lerp(Colors.yellow, Colors.orange, (norm - 0.5) / 0.25)!;
+      } else {
+        color = Color.lerp(Colors.orange, Colors.red, (norm - 0.75) / 0.25)!;
+      }
+      heatmapImg.setPixelRgba(
+        i % width,
+        i ~/ width,
+        color.red,
+        color.green,
+        color.blue,
+        255,
+      );
+    }
+    final pngBytes = Uint8List.fromList(img.encodePng(heatmapImg));
+    sendPort.send(pngBytes);
   }
 }
