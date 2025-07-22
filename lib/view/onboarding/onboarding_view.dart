@@ -194,21 +194,21 @@ class _OnboardingViewState extends State<OnboardingView> {
           cameraPermission: _cameraPermission,
           flashlightPermission: _flashlightPermission,
         ),
+        isAdmin: existingData?['isAdmin'] ?? false,
+        dataSharingEnabled: existingData?['dataSharingEnabled'] ?? false,
+        hasCompletedOnboarding: true,
       );
 
-      // Save to Firestore
+      // Save to Firestore (now includes hasCompletedOnboarding)
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .set(userModel.toMap());
 
-      // Set onboarding completion flag
+      // Set onboarding completion flag in SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('hasCompletedOnboarding', true);
-      // Also set onboarding completion in Firestore
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'hasCompletedOnboarding': true,
-      }, SetOptions(merge: true));
+      // (Removed extra merge write for hasCompletedOnboarding)
 
       // Navigate to main tab view
       if (mounted) {
@@ -351,49 +351,43 @@ class _OnboardingViewState extends State<OnboardingView> {
 
               // Hypertension Status
               _buildQuestionTitle('Do you have hypertension?'),
-              Row(
+              Column(
                 children: [
-                  Expanded(
-                    child: RadioListTile<String>(
-                      title: Text('Yes', style: TextStyle(color: TColor.textColor)),
-                      value: 'Yes',
-                      groupValue: _hypertensionStatus,
-                      onChanged: (value) {
-                        setState(() {
-                          _hypertensionStatus = value;
-                        });
-                      },
-                      activeColor: TColor.primaryColor1,
-                    ),
+                  RadioListTile<String>(
+                    title: Text('Yes', style: TextStyle(color: TColor.textColor)),
+                    value: 'Yes',
+                    groupValue: _hypertensionStatus,
+                    onChanged: (value) {
+                      setState(() {
+                        _hypertensionStatus = value;
+                      });
+                    },
+                    activeColor: TColor.primaryColor1,
                   ),
-                  Expanded(
-                    child: RadioListTile<String>(
-                      title: Text('No', style: TextStyle(color: TColor.textColor)),
-                      value: 'No',
-                      groupValue: _hypertensionStatus,
-                      onChanged: (value) {
-                        setState(() {
-                          _hypertensionStatus = value;
-                        });
-                      },
-                      activeColor: TColor.primaryColor1,
-                    ),
+                  RadioListTile<String>(
+                    title: Text('No', style: TextStyle(color: TColor.textColor)),
+                    value: 'No',
+                    groupValue: _hypertensionStatus,
+                    onChanged: (value) {
+                      setState(() {
+                        _hypertensionStatus = value;
+                      });
+                    },
+                    activeColor: TColor.primaryColor1,
                   ),
-                  Expanded(
-                    child: RadioListTile<String>(
-                      title: Text('Not sure', style: TextStyle(color: TColor.textColor)),
-                      value: 'Not sure',
-                      groupValue: _hypertensionStatus,
-                      onChanged: (value) {
-                        setState(() {
-                          _hypertensionStatus = value;
-                        });
-                      },
-                      activeColor: TColor.primaryColor1,
-                    ),
-          ),
-        ],
-      ),
+                  RadioListTile<String>(
+                    title: Text('Not sure', style: TextStyle(color: TColor.textColor)),
+                    value: 'Not sure',
+                    groupValue: _hypertensionStatus,
+                    onChanged: (value) {
+                      setState(() {
+                        _hypertensionStatus = value;
+                      });
+                    },
+                    activeColor: TColor.primaryColor1,
+                  ),
+                ],
+              ),
 
               // Diagnosis Date (if Yes)
               if (_hypertensionStatus == 'Yes') ...[

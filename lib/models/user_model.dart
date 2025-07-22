@@ -7,6 +7,7 @@ class UserModel {
   final MeasurementContext measurementContext;
   final bool isAdmin;
   final bool dataSharingEnabled;
+  final bool hasCompletedOnboarding;
 
   UserModel({
     required this.id,
@@ -15,6 +16,7 @@ class UserModel {
     required this.measurementContext,
     this.isAdmin = false,
     this.dataSharingEnabled = false,
+    this.hasCompletedOnboarding = false,
   });
 
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
@@ -26,6 +28,7 @@ class UserModel {
       measurementContext: MeasurementContext.fromMap(data['measurementContext'] ?? {}),
       isAdmin: data['isAdmin'] ?? false,
       dataSharingEnabled: data['dataSharingEnabled'] ?? false,
+      hasCompletedOnboarding: data['hasCompletedOnboarding'] ?? false,
     );
   }
 
@@ -36,6 +39,7 @@ class UserModel {
       'measurementContext': measurementContext.toMap(),
       'isAdmin': isAdmin,
       'dataSharingEnabled': dataSharingEnabled,
+      'hasCompletedOnboarding': hasCompletedOnboarding,
     };
   }
 
@@ -46,6 +50,7 @@ class UserModel {
     MeasurementContext? measurementContext,
     bool? isAdmin,
     bool? dataSharingEnabled,
+    bool? hasCompletedOnboarding,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -54,6 +59,7 @@ class UserModel {
       measurementContext: measurementContext ?? this.measurementContext,
       isAdmin: isAdmin ?? this.isAdmin,
       dataSharingEnabled: dataSharingEnabled ?? this.dataSharingEnabled,
+      hasCompletedOnboarding: hasCompletedOnboarding ?? this.hasCompletedOnboarding,
     );
   }
 }

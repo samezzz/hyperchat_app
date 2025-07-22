@@ -134,6 +134,7 @@ class _MeasureViewState extends State<MeasureView>
   static const int _fingerDetectionConsecutive =
       5; // Number of consecutive detections needed
   int _consecutiveDetections = 0;
+  int _consecutiveMisses = 0; // Add this near _consecutiveDetections
   bool _fingerDetectedReadyToStart = false;
 
   late AnimationController _heartController;
@@ -345,6 +346,7 @@ class _MeasureViewState extends State<MeasureView>
       }
       if (!_isFlashlightOn) {
         _consecutiveDetections = 0;
+        _consecutiveMisses = 0; // Reset misses on no flashlight
         if (_isFingerDetected) {
           setState(() {
             _isFingerDetected = false;
@@ -394,6 +396,7 @@ class _MeasureViewState extends State<MeasureView>
       bool isFingerPresent = avgBrightness < _fingerDetectionThresholdValue && avgRedness > _rednessThreshold;
       if (isFingerPresent) {
         _consecutiveDetections++;
+        _consecutiveMisses = 0; // Reset misses on detection
         if (_consecutiveDetections >= _fingerDetectionConsecutive && !isMeasuring) {
           if (!_isFingerDetected) {
             setState(() {
@@ -402,8 +405,10 @@ class _MeasureViewState extends State<MeasureView>
           }
         }
       } else {
+        _consecutiveMisses++;
         _consecutiveDetections = 0;
-        if (_isFingerDetected) {
+        // Only set to false after 3 consecutive misses
+        if (_consecutiveMisses >= 3 && _isFingerDetected) {
           setState(() {
             _isFingerDetected = false;
           });

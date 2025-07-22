@@ -219,15 +219,6 @@ class _MeasureResultViewState extends State<MeasureResultView> {
     return widget.estimatedBPM;
   }
 
-  // Generate BP in the range 112-122/76-81 for display
-  Map<String, int> get displayBP {
-    // Use a random value in the range for realism
-    final now = DateTime.now().millisecondsSinceEpoch;
-    int systolic = 112 + (now % 11); // 112 to 122
-    int diastolic = 76 + ((now ~/ 1000) % 6); // 76 to 81
-    return {'systolic': systolic, 'diastolic': diastolic};
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -298,7 +289,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    displayBP['systolic'].toString(),
+                    _calculatedBP['systolic'].toString(),
                     style: TextStyle(
                       color: TColor.primaryColor1,
                       fontSize: 48,
@@ -314,7 +305,7 @@ class _MeasureResultViewState extends State<MeasureResultView> {
                     ),
                   ),
                   Text(
-                    displayBP['diastolic'].toString(),
+                    _calculatedBP['diastolic'].toString(),
                     style: TextStyle(
                       color: TColor.primaryColor1,
                       fontSize: 48,

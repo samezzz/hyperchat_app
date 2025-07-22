@@ -504,10 +504,7 @@ class _RegisterViewState extends State<RegisterView> {
                                         color: TColor.primaryColor1,
                                         fontWeight: FontWeight.w600,
                                       ),
-                                      recognizer: TapGestureRecognizer()
-                                        ..onTap = () {
-                                          // TODO: Navigate to Terms of Service
-                                        },
+                                      // recognizer removed to deactivate link
                                     ),
                                     TextSpan(
                                       text: " and ",
@@ -522,10 +519,7 @@ class _RegisterViewState extends State<RegisterView> {
                                         color: TColor.primaryColor1,
                                         fontWeight: FontWeight.w600,
                                       ),
-                                      recognizer: TapGestureRecognizer()
-                                        ..onTap = () {
-                                          // TODO: Navigate to Privacy Policy
-                                        },
+                                      // recognizer removed to deactivate link
                                     ),
                                   ],
                                 ),

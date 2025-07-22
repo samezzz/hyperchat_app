@@ -113,13 +113,13 @@ class HealthSupportView extends StatelessWidget {
     required String title,
     required String description,
     required IconData icon,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
   }) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       color: TColor.cardColor,
       child: InkWell(
-        onTap: onTap,
+        onTap: null, // Deactivated
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
