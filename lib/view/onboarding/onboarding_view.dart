@@ -354,40 +354,40 @@ class _OnboardingViewState extends State<OnboardingView> {
               Column(
                 children: [
                   RadioListTile<String>(
-                    title: Text('Yes', style: TextStyle(color: TColor.textColor)),
-                    value: 'Yes',
-                    groupValue: _hypertensionStatus,
-                    onChanged: (value) {
-                      setState(() {
-                        _hypertensionStatus = value;
-                      });
-                    },
-                    activeColor: TColor.primaryColor1,
-                  ),
+                      title: Text('Yes', style: TextStyle(color: TColor.textColor)),
+                      value: 'Yes',
+                      groupValue: _hypertensionStatus,
+                      onChanged: (value) {
+                        setState(() {
+                          _hypertensionStatus = value;
+                        });
+                      },
+                      activeColor: TColor.primaryColor1,
+                    ),
                   RadioListTile<String>(
-                    title: Text('No', style: TextStyle(color: TColor.textColor)),
-                    value: 'No',
-                    groupValue: _hypertensionStatus,
-                    onChanged: (value) {
-                      setState(() {
-                        _hypertensionStatus = value;
-                      });
-                    },
-                    activeColor: TColor.primaryColor1,
-                  ),
+                      title: Text('No', style: TextStyle(color: TColor.textColor)),
+                      value: 'No',
+                      groupValue: _hypertensionStatus,
+                      onChanged: (value) {
+                        setState(() {
+                          _hypertensionStatus = value;
+                        });
+                      },
+                      activeColor: TColor.primaryColor1,
+                    ),
                   RadioListTile<String>(
-                    title: Text('Not sure', style: TextStyle(color: TColor.textColor)),
-                    value: 'Not sure',
-                    groupValue: _hypertensionStatus,
-                    onChanged: (value) {
-                      setState(() {
-                        _hypertensionStatus = value;
-                      });
-                    },
-                    activeColor: TColor.primaryColor1,
-                  ),
-                ],
-              ),
+                      title: Text('Not sure', style: TextStyle(color: TColor.textColor)),
+                      value: 'Not sure',
+                      groupValue: _hypertensionStatus,
+                      onChanged: (value) {
+                        setState(() {
+                          _hypertensionStatus = value;
+                        });
+                      },
+                      activeColor: TColor.primaryColor1,
+          ),
+        ],
+      ),
 
               // Diagnosis Date (if Yes)
               if (_hypertensionStatus == 'Yes') ...[
